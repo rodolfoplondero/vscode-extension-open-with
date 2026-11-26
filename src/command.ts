@@ -39,8 +39,8 @@ export async function runOpenExternal(
       return 'invalid';
     }
     if (!await host.prepareFile(file)) return 'cancelled';
-    const known = bridge.peek?.(file.fsPath)
-      ?? (bridge.getCached?.(file.fsPath) ? { apps: bridge.getCached(file.fsPath)!, stale: false } : undefined);
+    const fresh = bridge.peek ? undefined : bridge.getCached?.(file.fsPath);
+    const known = bridge.peek?.(file.fsPath) ?? (fresh ? { apps: fresh, stale: false } : undefined);
     let apps = known?.apps ?? [];
     let finished = false;
     let unavailable: { detail?: string } | undefined;
@@ -55,8 +55,10 @@ export async function runOpenExternal(
       }, error => {
         if (finished) return;
         // A list already on screen stays usable; only an empty picker reports the failure.
-        if (apps.length === 0) { unavailable = { detail: error instanceof Error ? error.message : String(error) }; session.hide(); return; }
+        const detail = error instanceof Error ? error.message : String(error);
+        if (apps.length === 0) { unavailable = { detail }; session.hide(); return; }
         session.setBusy(false);
+        if (force) void host.error(`Could not refresh the applications: ${detail}`);
       });
     };
     const session = host.openPicker(file.fsPath, apps, !known || known.stale, () => load(true));

@@ -87,9 +87,11 @@ export class WindowsBridge {
     return entry && !entry.stale ? entry.apps : undefined;
   }
   invalidate(filePath: string): void {
-    this.cache.delete(path.win32.extname(filePath).toLowerCase());
+    const key = path.win32.extname(filePath).toLowerCase();
+    this.cache.delete(key);
+    this.inflight.delete(key || filePath.toLowerCase());
   }
-  clearCache(): void { this.cache.clear(); }
+  clearCache(): void { this.cache.clear(); this.inflight.clear(); }
   /**
    * Lists applications for a file. Concurrent calls for one format share one Windows query.
    * A call without a signal keeps the query alive; the query stops only when every caller
@@ -103,7 +105,8 @@ export class WindowsBridge {
       if (cached) return cached;
     }
     const key = path.win32.extname(filePath).toLowerCase() || filePath.toLowerCase();
-    let query = this.inflight.get(key);
+    // A forced refresh must not return a result that started before the request.
+    let query = force ? undefined : this.inflight.get(key);
     if (!query) query = this.start(filePath, key);
     return this.wait(query, key, signal);
   }
@@ -111,7 +114,7 @@ export class WindowsBridge {
     const controller = new AbortController();
     const query: Query = {
       controller, pending: 0, keepAlive: 0,
-      promise: this.query(filePath, controller.signal).finally(() => {
+      promise: this.query(filePath, controller.signal, () => this.inflight.get(key) === query).finally(() => {
         if (this.inflight.get(key) === query) this.inflight.delete(key);
       })
     };
@@ -137,7 +140,7 @@ export class WindowsBridge {
         error => { signal.removeEventListener('abort', onAbort); reject(error); });
     });
   }
-  private async query(filePath: string, signal: AbortSignal): Promise<App[]> {
+  private async query(filePath: string, signal: AbortSignal, isCurrent: () => boolean): Promise<App[]> {
     let parsed: unknown;
     try {
       const response = await this.run({ action: 'list', filePath }, signal);
@@ -161,7 +164,8 @@ export class WindowsBridge {
       Number(b.recommended) - Number(a.recommended) || a.name.localeCompare(b.name, 'en') || a.id.localeCompare(b.id));
     const key = path.win32.extname(filePath).toLowerCase();
     const minutes = this.cacheMinutes();
-    if (key && apps.length > 0 && Number.isFinite(minutes) && minutes > 0) {
+    // A query replaced by a refresh, or detached by invalidate() or clearCache(), must not refill the cache.
+    if (isCurrent() && key && apps.length > 0 && Number.isFinite(minutes) && minutes > 0) {
       this.cache.set(key, { apps: apps.map(app => ({ ...app })), savedAt: this.now() });
     }
     return apps;

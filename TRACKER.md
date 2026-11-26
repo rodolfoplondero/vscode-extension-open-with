@@ -217,3 +217,4 @@ _Nothing here._
 - 2026-11-26 · OWE-007 · Done · Marketplace and Open VSX jobs succeeded; 0.2.1 published to both stores and PUBLISH_TO_STORES=true enables automatic store publication on future tags.
 - 2026-11-26 · OWE-009 · Opened · Agreed a design to show the list instantly; picker, stale list, refresh and tab warming built.
 - 2026-11-26 · OWE-009 · Progress · All 81 tests passed; 0.2.2 VSIX built and verified in isolation; awaiting review and push.
+- 2026-11-26 · OWE-009 · Progress · Code review fixes: Enter guard while loading, fresh refresh query, cache refill and warming scope; 87 tests pass.

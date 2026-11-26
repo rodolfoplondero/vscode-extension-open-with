@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { runOpenExternal, Choice, FileTarget, Host, PickerSession } from './command';
 import type { App } from './windows';
 import { WindowsBridge } from './windows';
-import { defaultPreloadExtensions, Preloader } from './preload';
+import { defaultPreloadExtensions, normalizeExtensions, Preloader } from './preload';
 import { scanWorkspace } from './workspace';
 
 interface AppItem extends vscode.QuickPickItem { choice?: Choice | { kind: 'refresh' } }
@@ -49,12 +49,15 @@ export function activate(context: vscode.ExtensionContext): void {
     return process.platform === 'win32' && config.get<boolean>('preloadEnabled', true)
       && config.get<number>('cacheDurationMinutes', 5) > 0;
   };
-  // Query the active tab's format ahead of time so the picker usually finds a fresh list.
+  // Query the active tab's format ahead of time (configured formats only) so the picker usually finds a fresh list.
   const warmActiveTab = () => {
     if (!warmingEnabled()) return;
     const input = vscode.window.tabGroups?.activeTabGroup?.activeTab?.input as { uri?: vscode.Uri } | undefined;
     const uri = input?.uri;
-    if (uri?.scheme !== 'file' || !path.win32.extname(uri.fsPath) || bridge.getCached(uri.fsPath)) return;
+    if (uri?.scheme !== 'file' || bridge.getCached(uri.fsPath)) return;
+    const configured = normalizeExtensions(vscode.workspace.getConfiguration('openWithExternal')
+      .get<string[]>('preloadExtensions', defaultPreloadExtensions));
+    if (!configured.includes(path.win32.extname(uri.fsPath).toLowerCase())) return;
     bridge.list(uri.fsPath).catch(() => { /* Warming is best effort and never shows an error. */ });
   };
   let warmTimer: ReturnType<typeof setTimeout> | undefined;
@@ -64,7 +67,6 @@ export function activate(context: vscode.ExtensionContext): void {
   };
   const tabSubscription = vscode.window.tabGroups?.onDidChangeTabs(scheduleWarming);
   context.subscriptions.push({ dispose: () => { clearTimeout(warmTimer); tabSubscription?.dispose(); } });
-  scheduleWarming();
   const host: Host = {
     platform: process.platform,
     activeFile: () => vscode.window.activeTextEditor?.document.uri,
@@ -94,11 +96,11 @@ export function activate(context: vscode.ExtensionContext): void {
       picker.ignoreFocusOut = false;
       picker.busy = busy;
       const render = (apps: App[]) => {
-        const activeId = (picker.activeItems[0]?.choice as Choice | undefined)?.kind === 'app'
-          ? (picker.activeItems[0].choice as { app: App }).app.id : undefined;
+        const identity = (item?: AppItem) => item?.choice?.kind === 'app' ? item.choice.app.id : item?.choice?.kind;
+        const activeId = identity(picker.activeItems[0]);
         const items = buildItems(apps);
         picker.items = items;
-        const active = items.find(item => item.choice?.kind === 'app' && item.choice.app.id === activeId);
+        const active = activeId === undefined ? undefined : items.find(item => identity(item) === activeId);
         if (active) picker.activeItems = [active];
       };
       render(initialApps);
@@ -107,6 +109,8 @@ export function activate(context: vscode.ExtensionContext): void {
           const choice = (picker.selectedItems[0] ?? picker.activeItems[0])?.choice;
           if (!choice) return;
           if (choice.kind === 'refresh') { onRefresh(); return; }
+          // While the list loads, typing filters down to the Windows option; Enter must not launch it by accident.
+          if (choice.kind === 'native' && picker.busy && picker.value.trim() !== '') return;
           resolve(choice);
           picker.hide();
         });

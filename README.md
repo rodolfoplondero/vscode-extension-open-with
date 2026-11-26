@@ -83,7 +83,7 @@ Each pass requests at most **5,000 matching file paths across all local roots** 
 
 Preloading reads filenames and file metadata, never file contents, and does not open or execute files. Queries run one at a time. Your Open With command interrupts and drains pending background work before proceeding; remaining formats can resume afterward. Background failures stay quiet and do not block on-demand discovery.
 
-Preloaded results use the existing cache lifetime, starting when each query completes. There is no periodic refresh. When you switch to a tab, the extension also queries the application list for that file's format in the background (when preloading and caching are on), so the picker usually finds it ready. A first use after expiry shows the older list and refreshes it in the background. Startup responsiveness and native discovery should be checked after installing the VSIX.
+Preloaded results use the existing cache lifetime, starting when each query completes. There is no periodic refresh. When you switch to a tab, the extension also queries the application list for that file's format in the background (only for formats in the preload list, and when preloading and caching are on; never at startup), so the picker usually finds it ready. A first use after expiry shows the older list and refreshes it in the background. Startup responsiveness and native discovery should be checked after installing the VSIX.
 
 ## Application discovery and DOCX filtering
 

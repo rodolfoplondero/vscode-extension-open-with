@@ -262,6 +262,7 @@ const pdfTab = { uri: { scheme: 'file', fsPath: 'C:\\docs\\report.PDF' } };
 const warmed = async (t, overrides, settings) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const result = activate(t, overrides, { tab: pdfTab, ...settings });
+  result.tabsChange?.call();
   t.mock.timers.tick(300);
   await tick();
   return result;
@@ -294,4 +295,50 @@ test('a failed warming query is silent', async t => {
   const { calls } = await warmed(t, { list: async () => { throw new Error('blocked'); } });
   assert.equal(calls.errors.length, 0);
   assert.equal(calls.info.length, 0);
+});
+
+test('tab warming is skipped for formats outside the configured list', async t => {
+  const { calls } = await warmed(t, {}, { tab: { uri: { scheme: 'file', fsPath: 'C:\docs\archive.zip' } } });
+  assert.equal(calls.lists, 0);
+});
+
+test('nothing is queried at startup when the window opens', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { calls } = activate(t, {}, { tab: pdfTab });
+  t.mock.timers.tick(1000);
+  await tick();
+  assert.equal(calls.lists, 0);
+});
+
+test('Enter on the Windows option is ignored while loading with typed text, but works with an empty search', async t => {
+  let finish;
+  const { calls, run } = activate(t, { list: () => new Promise(resolve => { finish = resolve; }) });
+  const done = run();
+  await tick();
+  const picker = calls.pickers[0];
+  picker.value = 'word';
+  picker.accept(picker.items[0]);
+  await tick();
+  assert.equal(calls.pickers.length, 1);
+  picker.value = '';
+  picker.accept(picker.items[0]);
+  assert.equal(await done, undefined);
+  finish([]);
+});
+
+test('a failed explicit refresh keeps the list and reports the failure', async t => {
+  const { calls, run } = activate(t, { list: async (_file, _signal, force) => {
+    if (force) throw new Error('policy blocked');
+    return [{ name: 'Editor', id: 'editor', recommended: true }];
+  } });
+  const done = run();
+  await tick(); await tick();
+  const picker = calls.pickers[0];
+  picker.accept(picker.items.find(item => item.label === 'Refresh Applications'));
+  await tick(); await tick();
+  assert.equal(picker.busy, false);
+  assert.equal(picker.items[0].label, 'Editor');
+  assert.match(calls.errors[0], /policy blocked/);
+  picker.hide();
+  await done;
 });
