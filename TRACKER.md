@@ -16,7 +16,7 @@ Last updated: 2026-11-26
 | OWE-004 | Preload applications for common workspace formats | ✅ Done | ▓▓▓▓▓ 5/5 | — | 2026-11-26 | 2026-11-26 | 2026-11-26 |
 | OWE-005 | Automate validation and GitHub releases | ✅ Done | ▓▓▓▓▓ 4/4 | — | 2026-11-26 | 2026-11-26 | 2026-11-26 |
 | OWE-006 | Release 0.2.0 with new extension identity | ✅ Done | ▓▓▓▓▓ 4/4 | — | 2026-11-26 | 2026-11-26 | 2026-11-26 |
-| OWE-007 | Publish 0.2.0 to Marketplace and Open VSX | ⬜ Open | ░░░░░ 0/2 | Store accounts | 2026-11-26 | — | 2026-11-26 |
+| OWE-007 | Publish 0.2.0 to Marketplace and Open VSX | ✅ Done | ▓▓▓▓▓ 2/2 | — | 2026-11-26 | 2026-11-26 | 2026-11-26 |
 
 ---
 
@@ -49,23 +49,27 @@ _Nothing here._
 
 ## Open
 
-### OWE-007 · Publish 0.2.0 to Marketplace and Open VSX
-
-- **Status:** Open
-- **Opened:** 2026-11-26
-- **Description:** Publish the verified 0.2.0 VSIX to Visual Studio Marketplace and Open VSX after the store accounts are configured.
-- **Done when:** The extension is visible and installable in both stores for version 0.2.0.
-- **Deliverables:** Marketplace listing, Open VSX listing
-- **Blocker:** Store account setup (publisher namespace, Trusted Publishing policy, Open VSX account/token, OVSX_PAT secret)
-
-**Subtasks**
-
-- [ ] OWE-007.1 Configure Marketplace publisher and Trusted Publishing policy
-- [ ] OWE-007.2 Configure Open VSX account, token and namespace, then publish both stores
+_Nothing here._
 
 ---
 
 ## Done
+
+### OWE-007 · Publish 0.2.0 to Marketplace and Open VSX
+
+- **Status:** Done
+- **Opened:** 2026-11-26 · **Done:** 2026-11-26
+- **Description:** Publish the verified VSIX to Visual Studio Marketplace and Open VSX after the store accounts are configured.
+- **Done when:** The extension is visible and installable in both stores.
+- **Deliverables:** [Marketplace listing](https://marketplace.visualstudio.com/items?itemName=rodolfoplondero.open-with-external), [Open VSX listing](https://open-vsx.org/extension/rodolfoplondero/open-with-external)
+- **Blocker:** —
+
+**Subtasks**
+
+- [x] OWE-007.1 Configure Marketplace publisher and Trusted Publishing policy
+- [x] OWE-007.2 Configure Open VSX account, token and namespace, then publish both stores
+
+---
 
 ### OWE-006 · Release 0.2.0 with new extension identity
 
@@ -192,3 +196,4 @@ _Nothing here._
 - 2026-11-26 · OWE-007 · Opened · Store publication pending Marketplace and Open VSX account setup.
 - 2026-11-26 · OWE-008 · Opened · README now links screenshots and GIFs; shot list and sample files ready for recording.
 - 2026-11-26 · OWE-008 · Progress · Scope reduced to one demo GIF; extra screenshots removed from the README.
+- 2026-11-26 · OWE-007 · Done · Marketplace and Open VSX jobs succeeded; 0.2.1 published to both stores and PUBLISH_TO_STORES=true enables automatic store publication on future tags.
