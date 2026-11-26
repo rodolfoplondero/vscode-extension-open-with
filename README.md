@@ -133,6 +133,16 @@ Press `F5` to launch an Extension Development Host. The compiled package is `ope
 
 ## Validation
 
+### GitHub Actions
+
+The **Test, package and release** workflow compiles and tests on Windows with Node.js 22 for pull requests, pushes to `main`, and manual runs. It builds a versioned VSIX, verifies its settings and activation against a mocked VS Code API in an isolated directory, and uploads the installable package as a workflow artifact for 14 days.
+
+Pushing a tag such as `v0.1.8` runs the same checks and publishes a GitHub release with the VSIX attached. The tag must match the version in `package.json`; mismatches stop the workflow. Update the version and lockfile, commit the changes through the normal PR process, then tag the intended release commit and push the tag. Published assets are preserved on reruns. GitHub generates the release notes. This does not publish to the VS Code Marketplace or Open VSX.
+
+The workflow uses the repository's automatic `GITHUB_TOKEN`; no personal access token is required. Build jobs have read-only repository access, and only the tag-triggered release job can write release metadata and assets. Existing release `v0.1.7` is left unchanged.
+
+### Automated and manual checks
+
 Automated checks run TypeScript compilation and tests on Windows, including background preloading, search exclusions, cancellation and foreground priority, cache expiration, refresh, settings changes, and simulated VS Code picker behavior. Earlier checks also compiled C# and called the extensionless-file bridge using PowerShell 7 on Linux. These checks **do not establish that native application discovery and launching work on Windows PowerShell 5.1**.
 
 Before distributing the extension, verify on Windows 10/11:
