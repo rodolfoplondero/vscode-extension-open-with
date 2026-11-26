@@ -2,6 +2,8 @@
 
 A **VS Code extension for Windows**: right-click a file, choose **Open With External Application…**, and select an application from a searchable list.
 
+![Right-click a file, search the application list and open the file](docs/media/demo.gif)
+
 ## Install
 
 1. Download `open-with-external-0.2.1.vsix`, or build it from source as described below.
