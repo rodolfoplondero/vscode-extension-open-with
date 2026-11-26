@@ -4,7 +4,7 @@ A **VS Code extension for Windows**: right-click a file, choose **Open With Exte
 
 ## Install
 
-1. Download `open-with-external-0.1.4.vsix`, or build it from source as described below.
+1. Download `open-with-external-0.1.7.vsix`, or build it from source as described below.
 2. In VS Code, open **Extensions** (`Ctrl+Shift+X`).
 3. Open the **…** menu, select **Install from VSIX…**, and choose the package.
 4. Reload the VS Code window if prompted.
@@ -12,7 +12,7 @@ A **VS Code extension for Windows**: right-click a file, choose **Open With Exte
 You can also install from a terminal:
 
 ```powershell
-code --install-extension .\open-with-external-0.1.4.vsix
+code --install-extension .\open-with-external-0.1.7.vsix
 ```
 
 The extension uses Windows PowerShell 5.1 and the Windows Shell APIs. You do not need Node.js or development tools to use the VSIX. Requires VS Code 1.96 or later; intended for Windows 10/11.
@@ -26,8 +26,55 @@ The extension uses Windows PowerShell 5.1 and the Windows Shell APIs. You do not
 - **Choose Another Application in Windows…** opens the native Windows dialog.
 - If no supported applications are found, the extension offers the native dialog.
 - For unsaved changes, choose **Save and Open**, **Open Saved Version**, or cancel.
+- The Windows dialog option remains available while you search, even if no application name matches.
+- Cancel an application query from its progress notification. If another Open With operation is still active, a message explains how to finish or dismiss it.
+- If the selected application fails to open the file, choose **Open With Windows…** to try another application.
+
+The picker searches application names. It shows handler identities only when application names repeat, to help distinguish installations.
 
 Extension labels and messages are in English. Application names and the native dialog use the language provided by Windows. The technical extension identifier remains `local-tools.abrir-com-externo`, and the command identifier remains `abrirComExterno.open` for compatibility.
+
+## Settings
+
+Open VS Code Settings (`Ctrl+,`) and search for `@ext:local-tools.abrir-com-externo`.
+
+**Open With External: Cache Duration Minutes** (`openWithExternal.cacheDurationMinutes`) controls how long application lists are reused for each file extension. The default is **5 minutes**; set **0** to query Windows every time. You can also set it in `settings.json`:
+
+```json
+{
+  "openWithExternal.cacheDurationMinutes": 5
+}
+```
+
+The cache is kept only in memory for the current VS Code window. It is shared by files with the same extension, regardless of extension capitalization. Its lifetime starts when discovery finishes; using a cached list does not extend that lifetime. Changing the setting clears all cached lists immediately. Empty lists, errors, cancelled queries, and extensionless files are not cached.
+
+Choose **Refresh Applications** in the picker to query Windows immediately for the current format. This action remains visible during search. A failed application launch or closing the native Windows chooser clears the cache for that format. Opening a selected application still goes through Windows; the cache speeds up discovery only.
+
+### Background preloading
+
+**Open With External: Preload Enabled** (`openWithExternal.preloadEnabled`) is on by default. After VS Code finishes starting, the extension searches local workspace folders for configured formats and preloads their application lists in the background. It also starts a new pass when workspace folders or relevant settings change.
+
+**Open With External: Preload Extensions** (`openWithExternal.preloadExtensions`) is an editable list. Defaults cover documents, text and data, code and web pages, images, and diagrams:
+
+```json
+{
+  "openWithExternal.preloadEnabled": true,
+  "openWithExternal.preloadExtensions": [
+    ".docx", ".xlsx", ".pptx", ".pdf", ".odt", ".ods", ".odp", ".rtf",
+    ".md", ".txt", ".csv", ".json", ".xml", ".yaml", ".yml",
+    ".py", ".html", ".css", ".js", ".ts",
+    ".png", ".jpg", ".jpeg", ".svg", ".webp", ".drawio", ".bpmn"
+  ]
+}
+```
+
+Entries may include or omit the leading dot; capitalization is ignored. An empty list disables preloading. Turning **Preload Enabled** off or setting **Cache Duration Minutes** to `0` cancels pending work and prevents new preload queries. No preloading occurs without a local workspace folder or on unsupported operating systems.
+
+Each pass requests at most **5,000 matching file paths across all local roots** and selects one accessible file per format. It respects `files.exclude` and `search.exclude`, including conditional sibling rules, and always skips `.git`, `node_modules`, `.venv`, `venv`, `dist`, and `build`. The result limit does not guarantee a fixed search duration in large workspaces. Formats outside the bounded search remain available through normal on-demand discovery.
+
+Preloading reads filenames and file metadata, never file contents, and does not open or execute files. Queries run one at a time. Your Open With command interrupts and drains pending background work before proceeding; remaining formats can resume afterward. Background failures stay quiet and do not block on-demand discovery.
+
+Preloaded results use the existing cache lifetime, starting when each query completes. There is no periodic refresh: a first use after expiry may query Windows again. Startup responsiveness and native discovery should be checked after installing the VSIX.
 
 ## Application discovery and DOCX filtering
 
@@ -70,7 +117,7 @@ npm test
 npm run package
 ```
 
-Press `F5` to launch an Extension Development Host. The compiled package is `open-with-external-0.1.4.vsix`. The extension has not been published to the VS Code Marketplace.
+Press `F5` to launch an Extension Development Host. The compiled package is `open-with-external-0.1.7.vsix`. The extension has not been published to the VS Code Marketplace.
 
 ### Project structure
 
@@ -78,13 +125,15 @@ Press `F5` to launch an Extension Development Host. The compiled package is `ope
 - `src/command.ts`: command flow, validation, and fallback.
 - `src/windows.ts`: JSON transport and response validation.
 - `src/compatibility.ts`: conservative DOCX editor filtering.
+- `src/preload.ts`: sequential background work and foreground priority.
+- `src/workspace.ts`: bounded workspace search and exclusions.
 - `scripts/bridge.ps1`: PowerShell entry point.
 - `scripts/Associations.cs`: Windows COM/Shell APIs.
-- `test/`: automated command, transport, and compatibility tests with simulated operating-system boundaries.
+- `test/`: automated command, transport, compatibility, and VS Code adapter tests with simulated operating-system and editor boundaries.
 
 ## Validation
 
-Automated tests and TypeScript compilation run on Linux. C# compilation and an extensionless-file bridge call have also been checked using PowerShell 7 on Linux. These checks **do not establish that native application discovery and launching work on Windows PowerShell 5.1**.
+Automated checks run TypeScript compilation and tests on Windows, including background preloading, search exclusions, cancellation and foreground priority, cache expiration, refresh, settings changes, and simulated VS Code picker behavior. Earlier checks also compiled C# and called the extensionless-file bridge using PowerShell 7 on Linux. These checks **do not establish that native application discovery and launching work on Windows PowerShell 5.1**.
 
 Before distributing the extension, verify on Windows 10/11:
 
@@ -95,6 +144,11 @@ Before distributing the extension, verify on Windows 10/11:
 - Test traditional and Microsoft Store applications where available, both on first launch and while already running; verify asynchronous activation and DDE-based applications.
 - Use paths containing spaces, accented characters, `&`, brackets, and apostrophes.
 - Cancel the picker and native dialog without opening the file.
+- Search for an unlisted application and check that the Windows dialog option remains visible.
+- Cancel a pending application query, then invoke the command again.
+- Invoke the command while a picker or Windows dialog is already open and check the explanatory message.
+- Change Cache Duration Minutes in Settings; check repeated files of the same format, expiry, Refresh Applications, and disabling with 0.
+- Open a local folder with several configured formats and check background preloading, exclusions, disabling, and an immediate foreground Open With request.
 - Try an unknown format and an extensionless file.
 - Verify saving changes, opening the saved disk version, and cancelling.
 - Remove or change an association while the picker is open and check the error message.
