@@ -22,6 +22,24 @@ Last updated: 2026-11-26
 
 ## Doing
 
+### OWE-009 · Make the application list appear instantly
+
+- **Status:** Doing
+- **Opened:** 2026-11-26 · **Done:** —
+- **Description:** Open the picker immediately and fill it as Windows answers, so a short wait for the application list never feels slow.
+- **Done when:** The picker opens at once for any format, older lists show instantly and refresh in the background, and version 0.2.2 is packaged and verified.
+- **Deliverables:** [CHANGELOG](CHANGELOG.md), [README](README.md)
+- **Blocker:** —
+
+**Subtasks**
+
+- [x] OWE-009.1 Open the picker at once with a progress bar and share one query per format
+- [x] OWE-009.2 Show the older list instantly after expiry and refresh it in the background
+- [x] OWE-009.3 Refresh Applications updates the open picker
+- [x] OWE-009.4 Warm the cache for the active tab's format
+- [x] OWE-009.5 Update README, CHANGELOG and version 0.2.2; verify the VSIX
+- [ ] OWE-009.6 Review, push, open the pull request and publish (In progress)
+
 ### OWE-008 · Add a demo GIF to the README
 
 - **Status:** Doing
@@ -197,3 +215,5 @@ _Nothing here._
 - 2026-11-26 · OWE-008 · Opened · README now links screenshots and GIFs; shot list and sample files ready for recording.
 - 2026-11-26 · OWE-008 · Progress · Scope reduced to one demo GIF; extra screenshots removed from the README.
 - 2026-11-26 · OWE-007 · Done · Marketplace and Open VSX jobs succeeded; 0.2.1 published to both stores and PUBLISH_TO_STORES=true enables automatic store publication on future tags.
+- 2026-11-26 · OWE-009 · Opened · Agreed a design to show the list instantly; picker, stale list, refresh and tab warming built.
+- 2026-11-26 · OWE-009 · Progress · All 81 tests passed; 0.2.2 VSIX built and verified in isolation; awaiting review and push.

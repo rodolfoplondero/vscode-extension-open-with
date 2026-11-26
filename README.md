@@ -6,7 +6,7 @@ A **VS Code extension for Windows**: right-click a file, choose **Open With Exte
 
 ## Install
 
-1. Download `open-with-external-0.2.1.vsix`, or build it from source as described below.
+1. Download `open-with-external-0.2.2.vsix`, or build it from source as described below.
 2. In VS Code, open **Extensions** (`Ctrl+Shift+X`).
 3. Open the **…** menu, select **Install from VSIX…**, and choose the package.
 4. Reload the VS Code window if prompted.
@@ -14,7 +14,7 @@ A **VS Code extension for Windows**: right-click a file, choose **Open With Exte
 You can also install from a terminal:
 
 ```powershell
-code --install-extension .\open-with-external-0.2.1.vsix
+code --install-extension .\open-with-external-0.2.2.vsix
 ```
 
 The extension uses Windows PowerShell 5.1 and the Windows Shell APIs. You do not need Node.js or development tools to use the VSIX. Requires VS Code 1.96 or later; intended for Windows 10/11.
@@ -29,7 +29,8 @@ The extension uses Windows PowerShell 5.1 and the Windows Shell APIs. You do not
 - If no supported applications are found, the extension offers the native dialog.
 - For unsaved changes, choose **Save and Open**, **Open Saved Version**, or cancel.
 - The Windows dialog option remains available while you search, even if no application name matches.
-- Cancel an application query from its progress notification. If another Open With operation is still active, a message explains how to finish or dismiss it.
+- The picker opens immediately. While Windows is still being queried, a progress bar shows and only **Choose Another Application in Windows…** is listed; applications appear as soon as they are found. If the list is already cached, even an older one, it shows at once.
+- Press `Esc` to close the picker at any time. A query in progress finishes in the background so the next request is fast. If another Open With operation is still active, a message explains how to finish or dismiss it.
 - If the selected application fails to open the file, choose **Open With Windows…** to try another application.
 
 The picker searches application names. It shows handler identities only when application names repeat, to help distinguish installations.
@@ -38,7 +39,7 @@ Extension labels, messages, documentation, and technical identifiers are in Engl
 
 ### Migrating from version 0.1.x
 
-Version 0.2.0 has a new extension identity and requires a new installation. Before installing it, find the old extension in Extensions using `@id:local-tools.abrir-com-externo`, uninstall it, and reload the window. Then install `open-with-external-0.2.1.vsix`. Keeping both versions enabled can cause duplicate commands and conflicting settings.
+Version 0.2.0 has a new extension identity and requires a new installation. Before installing it, find the old extension in Extensions using `@id:local-tools.abrir-com-externo`, uninstall it, and reload the window. Then install `open-with-external-0.2.2.vsix`. Keeping both versions enabled can cause duplicate commands and conflicting settings.
 
 Your existing `openWithExternal.*` user and workspace settings remain valid. Update any custom keybindings or integrations that reference the old command to use `openWithExternal.open`.
 
@@ -54,9 +55,9 @@ Open VS Code Settings (`Ctrl+,`) and search for `@ext:rodolfoplondero.open-with-
 }
 ```
 
-The cache is kept only in memory for the current VS Code window. It is shared by files with the same extension, regardless of extension capitalization. Its lifetime starts when discovery finishes; using a cached list does not extend that lifetime. Changing the setting clears all cached lists immediately. Empty lists, errors, cancelled queries, and extensionless files are not cached.
+The cache is kept only in memory for the current VS Code window. It is shared by files with the same extension, regardless of extension capitalization. The duration starts when discovery finishes; using a cached list does not extend it. After the duration, the older list is still shown immediately and refreshed in the background; the picker updates in place and keeps your search text and selection. If that refresh fails, the older list stays. Set **0** to turn caching off: no older list is kept, but the picker still opens at once. Changing the setting clears all cached lists immediately. Empty lists, errors, cancelled queries, and extensionless files are not cached.
 
-Choose **Refresh Applications** in the picker to query Windows immediately for the current format. This action remains visible during search. A failed application launch or closing the native Windows chooser clears the cache for that format. Opening a selected application still goes through Windows; the cache speeds up discovery only.
+Choose **Refresh Applications** in the picker to query Windows again for the current format. The picker stays open, shows a progress bar, and replaces the list when the new one arrives. This action remains visible during search. A failed application launch or closing the native Windows chooser clears the cache for that format. Opening a selected application still goes through Windows; the cache speeds up discovery only.
 
 ### Background preloading
 
@@ -82,7 +83,7 @@ Each pass requests at most **5,000 matching file paths across all local roots** 
 
 Preloading reads filenames and file metadata, never file contents, and does not open or execute files. Queries run one at a time. Your Open With command interrupts and drains pending background work before proceeding; remaining formats can resume afterward. Background failures stay quiet and do not block on-demand discovery.
 
-Preloaded results use the existing cache lifetime, starting when each query completes. There is no periodic refresh: a first use after expiry may query Windows again. Startup responsiveness and native discovery should be checked after installing the VSIX.
+Preloaded results use the existing cache lifetime, starting when each query completes. There is no periodic refresh. When you switch to a tab, the extension also queries the application list for that file's format in the background (when preloading and caching are on), so the picker usually finds it ready. A first use after expiry shows the older list and refreshes it in the background. Startup responsiveness and native discovery should be checked after installing the VSIX.
 
 ## Application discovery and DOCX filtering
 
@@ -125,7 +126,7 @@ npm test
 npm run package
 ```
 
-Press `F5` to launch an Extension Development Host. The compiled package is `open-with-external-0.2.1.vsix`. The extension has not been published to the VS Code Marketplace.
+Press `F5` to launch an Extension Development Host. The compiled package is `open-with-external-0.2.2.vsix`. The extension has not been published to the VS Code Marketplace.
 
 ### Project structure
 
@@ -169,7 +170,8 @@ Before distributing the extension, verify on Windows 10/11:
 - Use paths containing spaces, accented characters, `&`, brackets, and apostrophes.
 - Cancel the picker and native dialog without opening the file.
 - Search for an unlisted application and check that the Windows dialog option remains visible.
-- Cancel a pending application query, then invoke the command again.
+- Open a format never used in this window and check that the picker appears immediately with a progress bar. Press `Esc` before it finishes, then invoke the command again.
+- After the cache duration passes, open the picker and check that the older list shows at once and updates in place.
 - Invoke the command while a picker or Windows dialog is already open and check the explanatory message.
 - Change Cache Duration Minutes in Settings; check repeated files of the same format, expiry, Refresh Applications, and disabling with 0.
 - Open a local folder with several configured formats and check background preloading, exclusions, disabling, and an immediate foreground Open With request.

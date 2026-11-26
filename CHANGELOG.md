@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.2 — 2026-11-26
+
+- Open the application picker immediately with a progress bar instead of waiting for Windows.
+- Show the previous application list at once after the cache duration passes, and refresh it in the background.
+- Refresh Applications now updates the open picker instead of closing and reopening it.
+- Keep a query running when the picker is closed so it still fills the cache; concurrent requests for one format share one query.
+- Query the active tab's format in the background when switching tabs.
+
 ## 0.2.1 — 2026-11-26
 
 - Add a 256×256 extension icon and reference it in the extension manifest.

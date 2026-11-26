@@ -53,9 +53,12 @@ export function createPowerShellRunner(extensionPath: string, spawnProcess: Spaw
   });
 }
 
+interface Query { promise: Promise<App[]>; controller: AbortController; pending: number; keepAlive: number }
+
 export class WindowsBridge {
   private readonly run: Runner;
   private readonly cache = new Map<string, { apps: App[]; savedAt: number }>();
+  private readonly inflight = new Map<string, Query>();
   constructor(
     extensionPath: string, runner?: Runner,
     private readonly cacheMinutes: () => number = () => 0,
@@ -63,29 +66,82 @@ export class WindowsBridge {
   ) {
     this.run = runner ?? createPowerShellRunner(extensionPath);
   }
-  getCached(filePath: string): App[] | undefined {
+  /** The cached list for this format, even when older than the configured duration. */
+  peek(filePath: string): { apps: App[]; stale: boolean } | undefined {
     const key = path.win32.extname(filePath).toLowerCase();
     const entry = this.cache.get(key);
     if (!entry) return undefined;
     const minutes = this.cacheMinutes();
-    if (!Number.isFinite(minutes) || minutes <= 0 || this.now() - entry.savedAt >= minutes * 60_000) {
+    if (!Number.isFinite(minutes) || minutes <= 0) {
       this.cache.delete(key);
       return undefined;
     }
-    return entry.apps.map(app => ({ ...app }));
+    return {
+      apps: entry.apps.map(app => ({ ...app })),
+      stale: this.now() - entry.savedAt >= minutes * 60_000
+    };
+  }
+  /** The cached list only while it is still fresh. */
+  getCached(filePath: string): App[] | undefined {
+    const entry = this.peek(filePath);
+    return entry && !entry.stale ? entry.apps : undefined;
   }
   invalidate(filePath: string): void {
     this.cache.delete(path.win32.extname(filePath).toLowerCase());
   }
   clearCache(): void { this.cache.clear(); }
-  async list(filePath: string, signal?: AbortSignal): Promise<App[]> {
+  /**
+   * Lists applications for a file. Concurrent calls for one format share one Windows query.
+   * A call without a signal keeps the query alive; the query stops only when every caller
+   * that passed a signal has aborted and no caller without one is waiting.
+   * `force` skips a fresh cached list and queries Windows again.
+   */
+  async list(filePath: string, signal?: AbortSignal, force = false): Promise<App[]> {
     signal?.throwIfAborted();
-    const cached = this.getCached(filePath);
-    if (cached) return cached;
+    if (!force) {
+      const cached = this.getCached(filePath);
+      if (cached) return cached;
+    }
+    const key = path.win32.extname(filePath).toLowerCase() || filePath.toLowerCase();
+    let query = this.inflight.get(key);
+    if (!query) query = this.start(filePath, key);
+    return this.wait(query, key, signal);
+  }
+  private start(filePath: string, key: string): Query {
+    const controller = new AbortController();
+    const query: Query = {
+      controller, pending: 0, keepAlive: 0,
+      promise: this.query(filePath, controller.signal).finally(() => {
+        if (this.inflight.get(key) === query) this.inflight.delete(key);
+      })
+    };
+    query.promise.catch(() => { /* Each waiter reports the failure; this keeps it from being unhandled. */ });
+    this.inflight.set(key, query);
+    return query;
+  }
+  private wait(query: Query, key: string, signal?: AbortSignal): Promise<App[]> {
+    if (!signal) { query.keepAlive++; return query.promise; }
+    query.pending++;
+    return new Promise<App[]>((resolve, reject) => {
+      const onAbort = () => {
+        query.pending--;
+        if (query.pending === 0 && query.keepAlive === 0) {
+          if (this.inflight.get(key) === query) this.inflight.delete(key);
+          query.controller.abort(signal.reason);
+        }
+        reject(signal.reason);
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+      if (signal.aborted) { onAbort(); return; }
+      query.promise.then(apps => { signal.removeEventListener('abort', onAbort); resolve(apps); },
+        error => { signal.removeEventListener('abort', onAbort); reject(error); });
+    });
+  }
+  private async query(filePath: string, signal: AbortSignal): Promise<App[]> {
     let parsed: unknown;
     try {
       const response = await this.run({ action: 'list', filePath }, signal);
-      signal?.throwIfAborted();
+      signal.throwIfAborted();
       parsed = JSON.parse(response);
     }
     catch (error) {

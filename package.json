@@ -2,7 +2,7 @@
   "name": "open-with-external",
   "displayName": "Open With External Application",
   "description": "Open local files with compatible Windows applications from a searchable VS Code picker.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "publisher": "rodolfoplondero",
   "author": {
     "name": "Rodolfo Londero"
