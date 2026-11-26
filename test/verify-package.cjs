@@ -8,7 +8,7 @@ const manifest = require(path.join(root, 'package.json'));
 assert.equal(manifest.version, require('../package.json').version);
 assert.equal(manifest.publisher + '.' + manifest.name, 'rodolfoplondero.open-with-external');
 assert.equal(manifest.author.name, 'Rodolfo Londero');
-assert.equal(manifest.repository.url, 'https://github.com/rodolfoplondero/vscode-extension-open-with.git');
+assert.equal(manifest.repository.url, 'https://github.com/rodolfoplondero/vscode-open-with-external.git');
 assert.ok(manifest.activationEvents.includes('onStartupFinished'));
 const settings = manifest.contributes.configuration.properties;
 assert.equal(settings['openWithExternal.preloadEnabled'].default, true);

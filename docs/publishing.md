@@ -9,7 +9,7 @@ The selected publisher is **rodolfoplondero** and the author is **Rodolfo Londer
 1. Sign in to https://marketplace.visualstudio.com/manage and create or select publisher ID **rodolfoplondero**, with public display name **Rodolfo Londero**.
 2. Under that publisher, open **Trusted Publishing** and create a policy with:
    - Repository owner: `rodolfoplondero`
-   - Repository: `vscode-extension-open-with`
+   - Repository: `vscode-open-with-external`
    - Workflow: `ci-release.yml`
    - Environment: leave empty; the workflow does not declare an environment.
 3. Save the policy before running the publishing job.
@@ -26,7 +26,7 @@ Official instructions: https://code.visualstudio.com/api/working-with-extensions
 4. Create namespace **rodolfoplondero** with `npx ovsx create-namespace rodolfoplondero`, authenticated using the `OVSX_PAT` environment variable.
 5. Add the token to this repository as an Actions secret named **OVSX_PAT**. Do not put the token in source files, issues, PR descriptions, or chat messages.
 
-Repository secret settings: https://github.com/rodolfoplondero/vscode-extension-open-with/settings/secrets/actions
+Repository secret settings: https://github.com/rodolfoplondero/vscode-open-with-external/settings/secrets/actions
 
 Official instructions: https://github.com/eclipse-openvsx/openvsx/wiki/Publishing-Extensions
 

@@ -2,18 +2,18 @@
   "name": "open-with-external",
   "displayName": "Open With External Application",
   "description": "Open local files with compatible Windows applications from a searchable VS Code picker.",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "publisher": "rodolfoplondero",
   "author": {
     "name": "Rodolfo Londero"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/rodolfoplondero/vscode-extension-open-with.git"
+    "url": "https://github.com/rodolfoplondero/vscode-open-with-external.git"
   },
-  "homepage": "https://github.com/rodolfoplondero/vscode-extension-open-with#readme",
+  "homepage": "https://github.com/rodolfoplondero/vscode-open-with-external#readme",
   "bugs": {
-    "url": "https://github.com/rodolfoplondero/vscode-extension-open-with/issues"
+    "url": "https://github.com/rodolfoplondero/vscode-open-with-external/issues"
   },
   "keywords": [
     "open with",
