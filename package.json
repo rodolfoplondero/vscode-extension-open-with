@@ -1,9 +1,26 @@
 {
-  "name": "abrir-com-externo",
+  "name": "open-with-external",
   "displayName": "Open With External Application",
   "description": "Open local files with compatible Windows applications from a searchable VS Code picker.",
-  "version": "0.1.7",
-  "publisher": "local-tools",
+  "version": "0.2.0",
+  "publisher": "rodolfoplondero",
+  "author": {
+    "name": "Rodolfo Londero"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rodolfoplondero/vscode-extension-open-with.git"
+  },
+  "homepage": "https://github.com/rodolfoplondero/vscode-extension-open-with#readme",
+  "bugs": {
+    "url": "https://github.com/rodolfoplondero/vscode-extension-open-with/issues"
+  },
+  "keywords": [
+    "open with",
+    "external application",
+    "windows",
+    "file associations"
+  ],
   "license": "MIT",
   "engines": {
     "vscode": "^1.96.0"
@@ -85,7 +102,7 @@
     },
     "commands": [
       {
-        "command": "abrirComExterno.open",
+        "command": "openWithExternal.open",
         "title": "Open With External Application…",
         "category": "File",
         "enablement": "isWindows"
@@ -94,21 +111,21 @@
     "menus": {
       "explorer/context": [
         {
-          "command": "abrirComExterno.open",
+          "command": "openWithExternal.open",
           "when": "isWindows && resourceScheme == file && !explorerResourceIsFolder",
           "group": "navigation@20"
         }
       ],
       "editor/context": [
         {
-          "command": "abrirComExterno.open",
+          "command": "openWithExternal.open",
           "when": "isWindows && resourceScheme == file",
           "group": "navigation@20"
         }
       ],
       "editor/title/context": [
         {
-          "command": "abrirComExterno.open",
+          "command": "openWithExternal.open",
           "when": "isWindows && resourceScheme == file",
           "group": "navigation@20"
         }
@@ -119,12 +136,13 @@
     "compile": "tsc -p .",
     "test": "npm run compile && node --test test/*.test.cjs",
     "vscode:prepublish": "npm run compile",
-    "package": "vsce package --allow-missing-repository --out open-with-external-0.1.7.vsix"
+    "package": "vsce package --allow-missing-repository --out open-with-external-0.2.0.vsix"
   },
   "devDependencies": {
     "@types/node": "22.19.0",
     "@types/vscode": "1.96.0",
-    "@vscode/vsce": "3.7.1",
+    "@vscode/vsce": "4.1.1",
+    "ovsx": "1.4.0",
     "typescript": "5.9.3"
   },
   "private": true,

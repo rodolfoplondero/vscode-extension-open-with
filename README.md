@@ -4,7 +4,7 @@ A **VS Code extension for Windows**: right-click a file, choose **Open With Exte
 
 ## Install
 
-1. Download `open-with-external-0.1.7.vsix`, or build it from source as described below.
+1. Download `open-with-external-0.2.0.vsix`, or build it from source as described below.
 2. In VS Code, open **Extensions** (`Ctrl+Shift+X`).
 3. Open the **…** menu, select **Install from VSIX…**, and choose the package.
 4. Reload the VS Code window if prompted.
@@ -12,7 +12,7 @@ A **VS Code extension for Windows**: right-click a file, choose **Open With Exte
 You can also install from a terminal:
 
 ```powershell
-code --install-extension .\open-with-external-0.1.7.vsix
+code --install-extension .\open-with-external-0.2.0.vsix
 ```
 
 The extension uses Windows PowerShell 5.1 and the Windows Shell APIs. You do not need Node.js or development tools to use the VSIX. Requires VS Code 1.96 or later; intended for Windows 10/11.
@@ -32,11 +32,17 @@ The extension uses Windows PowerShell 5.1 and the Windows Shell APIs. You do not
 
 The picker searches application names. It shows handler identities only when application names repeat, to help distinguish installations.
 
-Extension labels and messages are in English. Application names and the native dialog use the language provided by Windows. The technical extension identifier remains `local-tools.abrir-com-externo`, and the command identifier remains `abrirComExterno.open` for compatibility.
+Extension labels, messages, documentation, and technical identifiers are in English. The author is **Rodolfo Londero**, the extension identifier is `rodolfoplondero.open-with-external`, and the command identifier is `openWithExternal.open`. Application names and the native dialog use the language provided by Windows.
+
+### Migrating from version 0.1.x
+
+Version 0.2.0 has a new extension identity and requires a new installation. Before installing it, find the old extension in Extensions using `@id:local-tools.abrir-com-externo`, uninstall it, and reload the window. Then install `open-with-external-0.2.0.vsix`. Keeping both versions enabled can cause duplicate commands and conflicting settings.
+
+Your existing `openWithExternal.*` user and workspace settings remain valid. Update any custom keybindings or integrations that reference the old command to use `openWithExternal.open`.
 
 ## Settings
 
-Open VS Code Settings (`Ctrl+,`) and search for `@ext:local-tools.abrir-com-externo`.
+Open VS Code Settings (`Ctrl+,`) and search for `@ext:rodolfoplondero.open-with-external`.
 
 **Open With External: Cache Duration Minutes** (`openWithExternal.cacheDurationMinutes`) controls how long application lists are reused for each file extension. The default is **5 minutes**; set **0** to query Windows every time. You can also set it in `settings.json`:
 
@@ -117,7 +123,7 @@ npm test
 npm run package
 ```
 
-Press `F5` to launch an Extension Development Host. The compiled package is `open-with-external-0.1.7.vsix`. The extension has not been published to the VS Code Marketplace.
+Press `F5` to launch an Extension Development Host. The compiled package is `open-with-external-0.2.0.vsix`. The extension has not been published to the VS Code Marketplace.
 
 ### Project structure
 
@@ -137,9 +143,15 @@ Press `F5` to launch an Extension Development Host. The compiled package is `ope
 
 The **Test, package and release** workflow compiles and tests on Windows with Node.js 22 for pull requests, pushes to `main`, and manual runs. It builds a versioned VSIX, verifies its settings and activation against a mocked VS Code API in an isolated directory, and uploads the installable package as a workflow artifact for 14 days.
 
-Pushing a tag such as `v0.1.8` runs the same checks and publishes a GitHub release with the VSIX attached. The tag must match the version in `package.json`; mismatches stop the workflow. Update the version and lockfile, commit the changes through the normal PR process, then tag the intended release commit and push the tag. Published assets are preserved on reruns. GitHub generates the release notes. This does not publish to the VS Code Marketplace or Open VSX.
+Pushing a tag such as `v0.2.0` runs the same checks and publishes a GitHub release with the VSIX attached. The tag must match the version in `package.json`; mismatches stop the workflow. Update the version and lockfile, commit the changes through the normal PR process, then tag the intended release commit and push the tag. Published assets are preserved on reruns. GitHub generates the release notes.
 
-The workflow uses the repository's automatic `GITHUB_TOKEN`; no personal access token is required. Build jobs have read-only repository access, and only the tag-triggered release job can write release metadata and assets. Existing release `v0.1.7` is left unchanged.
+The GitHub release job uses the repository's automatic `GITHUB_TOKEN`. Build jobs have read-only repository access, and only the tag-triggered release job can write release metadata and assets. Existing release `v0.1.7` is left unchanged.
+
+### Publishing to Visual Studio Marketplace and Open VSX
+
+Store publishing is prepared separately from GitHub releases. Configure your publisher namespace in both registries, a Marketplace Trusted Publishing policy, and the **OVSX_PAT** Actions secret as described in the [publishing guide](docs/publishing.md).
+
+After setup, run the workflow manually with **publish_marketplaces** enabled, or set the **PUBLISH_TO_STORES** repository variable to `true` for automatic publication on matching version tags. Marketplace publishing uses OIDC; Open VSX publishing uses its scoped publishing token. Neither store receives uploads from PR builds. Initial store publication is pending account setup.
 
 ### Automated and manual checks
 
