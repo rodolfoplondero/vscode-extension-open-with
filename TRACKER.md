@@ -15,6 +15,8 @@ Last updated: 2026-11-26
 | OWE-003 | Add configurable application discovery cache | ✅ Done | ▓▓▓▓▓ 4/4 | — | 2026-11-26 | 2026-11-26 | 2026-11-26 |
 | OWE-004 | Preload applications for common workspace formats | ✅ Done | ▓▓▓▓▓ 5/5 | — | 2026-11-26 | 2026-11-26 | 2026-11-26 |
 | OWE-005 | Automate validation and GitHub releases | ✅ Done | ▓▓▓▓▓ 4/4 | — | 2026-11-26 | 2026-11-26 | 2026-11-26 |
+| OWE-006 | Release 0.2.0 with new extension identity | ✅ Done | ▓▓▓▓▓ 4/4 | — | 2026-11-26 | 2026-11-26 | 2026-11-26 |
+| OWE-007 | Publish 0.2.0 to Marketplace and Open VSX | ⬜ Open | ░░░░░ 0/2 | Store accounts | 2026-11-26 | — | 2026-11-26 |
 
 ---
 
@@ -30,7 +32,43 @@ _Nothing here._
 
 ---
 
+## Open
+
+### OWE-007 · Publish 0.2.0 to Marketplace and Open VSX
+
+- **Status:** Open
+- **Opened:** 2026-11-26
+- **Description:** Publish the verified 0.2.0 VSIX to Visual Studio Marketplace and Open VSX after the store accounts are configured.
+- **Done when:** The extension is visible and installable in both stores for version 0.2.0.
+- **Deliverables:** Marketplace listing, Open VSX listing
+- **Blocker:** Store account setup (publisher namespace, Trusted Publishing policy, Open VSX account/token, OVSX_PAT secret)
+
+**Subtasks**
+
+- [ ] OWE-007.1 Configure Marketplace publisher and Trusted Publishing policy
+- [ ] OWE-007.2 Configure Open VSX account, token and namespace, then publish both stores
+
+---
+
 ## Done
+
+### OWE-006 · Release 0.2.0 with new extension identity
+
+- **Status:** Done
+- **Opened:** 2026-11-26 · **Done:** 2026-11-26
+- **Description:** Commit the identity rename, merge to main and tag v0.2.0 so the GitHub release publishes the verified VSIX.
+- **Done when:** The v0.2.0 tag builds in GitHub Actions and the release assets contain the VSIX.
+- **Deliverables:** [PR](https://github.com/rodolfoplondero/vscode-extension-open-with/pull/2), [GitHub release](https://github.com/rodolfoplondero/vscode-extension-open-with/releases/tag/v0.2.0)
+- **Blocker:** —
+
+**Subtasks**
+
+- [x] OWE-006.1 Commit the 0.2.0 identity rename on dev and run the test suite
+- [x] OWE-006.2 Push dev, open the pull request to main and merge it
+- [x] OWE-006.3 Tag v0.2.0 on the merge commit and push the tag
+- [x] OWE-006.4 Confirm the GitHub Actions release publishes the VSIX
+
+---
 
 ### OWE-001 · Review extension usability
 
@@ -134,3 +172,6 @@ _Nothing here._
 - 2026-11-26 · OWE-004 · Progress · Opened PR 1 and published release v0.1.7 with a verified VSIX from dev; main unchanged.
 - 2026-11-26 · OWE-005 · Opened · Configured PR builds and tag releases; local validation and workflow review passed.
 - 2026-11-26 · OWE-005 · Done · GitHub Actions passed Windows tests, VSIX verification and artifact upload; release skipped on PR.
+- 2026-11-26 · OWE-006 · Opened · Committed the 0.2.0 identity rename on dev; 61 tests passed.
+- 2026-11-26 · OWE-006 · Done · PR 2 merged, tag v0.2.0 pushed; GitHub release published the verified VSIX.
+- 2026-11-26 · OWE-007 · Opened · Store publication pending Marketplace and Open VSX account setup.
