@@ -2,7 +2,7 @@
   "name": "open-with-external",
   "displayName": "Open With External Application",
   "description": "Open local files with compatible Windows applications from a searchable VS Code picker.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "rodolfoplondero",
   "author": {
     "name": "Rodolfo Londero"
@@ -22,6 +22,7 @@
     "file associations"
   ],
   "license": "MIT",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.96.0"
   },
@@ -136,7 +137,7 @@
     "compile": "tsc -p .",
     "test": "npm run compile && node --test test/*.test.cjs",
     "vscode:prepublish": "npm run compile",
-    "package": "vsce package --allow-missing-repository --out open-with-external-0.2.0.vsix"
+    "package": "vsce package --allow-missing-repository"
   },
   "devDependencies": {
     "@types/node": "22.19.0",
