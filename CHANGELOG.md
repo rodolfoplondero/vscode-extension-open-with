@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 — 2026-11-26
+
+- Add a 256×256 extension icon and reference it in the extension manifest.
+
 ## 0.2.0 — 2026-11-26
 
 - Rename the extension identity to `rodolfoplondero.open-with-external` and its command to `openWithExternal.open` so current identifiers and settings instructions are in English.
