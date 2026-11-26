@@ -65,7 +65,6 @@ test('launch errors and manual invalidation clear only the relevant format; sett
 test('discovery passes cancellation to the process and rejects on abort', async () => {
   const controller = new AbortController();
   const runner = createPowerShellRunner('/extension', (_exe, _args, options) => {
-    assert.equal(options.signal, controller.signal);
     const child = new EventEmitter();
     child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
     options.signal.addEventListener('abort', () => {
@@ -262,4 +261,94 @@ test('other file types retain their registered recommended handlers', async () =
   const app = { id: 'C:\\Windows\\notepad.exe', name: 'Notepad', recommended: true };
   const bridge = new WindowsBridge('', async () => JSON.stringify([app]));
   assert.deepEqual(await bridge.list('C:\\notes.txt'), [app]);
+});
+
+test('peek returns an expired list marked stale; getCached returns only fresh lists', async () => {
+  let now = 0;
+  const bridge = new WindowsBridge('', async () => '[{"id":"editor","name":"Editor","recommended":true}]', () => 5, () => now);
+  assert.equal(bridge.peek('a.txt'), undefined);
+  await bridge.list('a.txt');
+  assert.equal(bridge.peek('A.TXT').stale, false);
+  now = 300000;
+  assert.equal(bridge.peek('b.txt').stale, true);
+  assert.equal(bridge.peek('b.txt').apps[0].name, 'Editor');
+  assert.equal(bridge.getCached('b.txt'), undefined);
+  bridge.invalidate('b.txt');
+  assert.equal(bridge.peek('b.txt'), undefined);
+});
+
+test('zero minutes keeps no list, fresh or stale', async () => {
+  const bridge = new WindowsBridge('', async () => '[{"id":"editor","name":"Editor","recommended":true}]', () => 0);
+  await bridge.list('a.txt');
+  assert.equal(bridge.peek('a.txt'), undefined);
+});
+
+test('force queries again even when the list is fresh', async () => {
+  let queries = 0;
+  const bridge = new WindowsBridge('', async () => { queries++; return '[{"id":"editor","name":"Editor","recommended":true}]'; }, () => 5);
+  await bridge.list('a.txt'); await bridge.list('a.txt');
+  assert.equal(queries, 1);
+  await bridge.list('a.txt', undefined, true);
+  assert.equal(queries, 2);
+});
+
+test('concurrent calls for one format share a single Windows query', async () => {
+  let queries = 0, finish;
+  const bridge = new WindowsBridge('', () => { queries++; return new Promise(resolve => { finish = resolve; }); }, () => 0);
+  const first = bridge.list('a.txt'), second = bridge.list('B.TXT');
+  finish('[{"id":"editor","name":"Editor","recommended":true}]');
+  assert.deepEqual((await first).map(a => a.id), (await second).map(a => a.id));
+  assert.equal(queries, 1);
+});
+
+test('an aborting caller rejects at once; the query continues while another caller waits without a signal', async () => {
+  let finish, processSignal;
+  const bridge = new WindowsBridge('', (_request, signal) => { processSignal = signal; return new Promise(resolve => { finish = resolve; }); }, () => 5);
+  const controller = new AbortController();
+  const aborting = bridge.list('a.txt', controller.signal);
+  const keeping = bridge.list('a.txt');
+  controller.abort();
+  await assert.rejects(aborting, { name: 'AbortError' });
+  assert.equal(processSignal.aborted, false);
+  finish('[{"id":"editor","name":"Editor","recommended":true}]');
+  assert.equal((await keeping).length, 1);
+  assert.equal(bridge.getCached('a.txt').length, 1);
+});
+
+test('the query stops once every caller with a signal has aborted and the next call starts a new query', async () => {
+  let queries = 0, processSignal;
+  const bridge = new WindowsBridge('', (_request, signal) => { queries++; processSignal = signal; return new Promise(() => {}); }, () => 5);
+  const controller = new AbortController();
+  const pending = bridge.list('a.txt', controller.signal);
+  controller.abort();
+  await assert.rejects(pending, { name: 'AbortError' });
+  assert.equal(processSignal.aborted, true);
+  bridge.list('a.txt').catch(() => {});
+  assert.equal(queries, 2);
+});
+
+test('a forced refresh starts a new query instead of joining one that started earlier', async () => {
+  let queries = 0;
+  const finishers = [];
+  const bridge = new WindowsBridge('', () => { queries++; return new Promise(resolve => finishers.push(resolve)); }, () => 5);
+  const older = bridge.list('a.txt');
+  const refreshed = bridge.list('a.txt', undefined, true);
+  assert.equal(queries, 2);
+  finishers[0]('[{"id":"old","name":"Old","recommended":true}]');
+  finishers[1]('[{"id":"new","name":"New","recommended":true}]');
+  assert.equal((await older)[0].id, 'old');
+  assert.equal((await refreshed)[0].id, 'new');
+  assert.equal(bridge.getCached('a.txt')[0].id, 'new');
+});
+
+test('a query finishing after invalidate or clearCache does not refill the cache', async () => {
+  for (const reset of [bridge => bridge.invalidate('a.txt'), bridge => bridge.clearCache()]) {
+    let finish;
+    const bridge = new WindowsBridge('', () => new Promise(resolve => { finish = resolve; }), () => 5);
+    const pending = bridge.list('a.txt');
+    reset(bridge);
+    finish('[{"id":"editor","name":"Editor","recommended":true}]');
+    await pending;
+    assert.equal(bridge.peek('a.txt'), undefined);
+  }
 });

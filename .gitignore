@@ -152,3 +152,8 @@ vite.config.ts.timestamp-*
 dist/
 *.vsix
 *.zip
+
+# Local activity tracker (not published)
+TRACKER.md
+TRACKER.html
+TRACKER-archive.md

@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 const Module = require('node:module');
 
 function activate(t, overrides = {}, settings = {}) {
-  const calls = { info: [], errors: [], picks: [], lists: 0, disposed: 0, scans: 0, files: [], config: settings.config ?? {} };
-  let command, onCancel, onConfigurationChange, onFoldersChange;
+  const calls = { info: [], errors: [], pickers: [], lists: 0, disposed: 0, scans: 0, files: [], config: settings.config ?? {} };
+  let command, onConfigurationChange, onFoldersChange, onTabsChange;
   const bridge = {
     getCached: () => undefined,
     list: async file => { calls.lists++; calls.files.push(file); return [
@@ -35,14 +35,24 @@ function activate(t, overrides = {}, settings = {}) {
     },
     commands: { registerCommand: (id, callback) => { calls.commandId = id; command = callback; return { dispose() {} }; } },
     window: {
-      showQuickPick: async (items, options) => { calls.picks.push({ items, options }); },
+      createQuickPick: () => {
+        const listeners = { accept: [], hide: [] };
+        const picker = {
+          items: [], activeItems: [], selectedItems: [], busy: false,
+          onDidAccept: callback => { listeners.accept.push(callback); return { dispose() {} }; },
+          onDidHide: callback => { listeners.hide.push(callback); return { dispose() {} }; },
+          show() { calls.pickers.push(picker); },
+          hide() { listeners.hide.forEach(callback => callback()); },
+          accept(item) { picker.selectedItems = [item]; listeners.accept.forEach(callback => callback()); },
+          dispose() { calls.disposed++; }
+        };
+        return picker;
+      },
       showInformationMessage: async message => { calls.info.push(message); },
       showErrorMessage: async message => { calls.errors.push(message); },
-      withProgress: async (options, task) => {
-        calls.progress = options;
-        return task({}, { isCancellationRequested: false, onCancellationRequested: callback => {
-          onCancel = callback; return { dispose: () => { calls.disposed++; } };
-        } });
+      tabGroups: settings.tab === undefined ? undefined : {
+        activeTabGroup: { activeTab: { input: settings.tab } },
+        onDidChangeTabs: callback => { onTabsChange = callback; return { dispose() {} }; }
       }
     }
   };
@@ -65,7 +75,7 @@ function activate(t, overrides = {}, settings = {}) {
     require('../dist/extension.js').activate({ extensionPath: '', subscriptions });
     t.after(() => subscriptions.forEach(subscription => subscription.dispose()));
   } finally { Module._load = originalLoad; }
-  return { calls, run: () => command({ scheme: 'file', fsPath: 'C:\\report.txt' }), cancel: () => onCancel(),
+  return { calls, run: () => command({ scheme: 'file', fsPath: 'C:\\report.txt' }), tabsChange: () => onTabsChange(),
     foldersChange: () => onFoldersChange(),
     configurationChange: relevant => onConfigurationChange({ affectsConfiguration: () => relevant }) };
 }
@@ -81,17 +91,61 @@ test('English extension identity and command agree across manifest, menus and re
   }
 });
 
-test('picker keeps the Windows escape route visible and searches names only', async t => {
+test('picker opens at once, keeps the Windows escape route visible and searches names only', async t => {
   const { calls, run } = activate(t);
-  await run();
-  const { items, options } = calls.picks[0];
+  const done = run();
+  await tick(); await tick();
+  const picker = calls.pickers[0];
+  const { items } = picker;
   assert.equal(items.at(-1).alwaysShow, true);
-  assert.equal(options.matchOnDescription, false);
-  assert.equal(options.matchOnDetail, false);
+  assert.match(items.at(-1).label, /Windows/);
+  assert.equal(picker.matchOnDescription, false);
+  assert.equal(picker.matchOnDetail, false);
   assert.equal(items[2].description, undefined);
   assert.ok(items[0].description.includes('C:\\Tools'));
   assert.ok(items[1].description.includes('D:\\Other'));
   assert.ok(items.every(item => !item.detail));
+  picker.hide();
+  await done;
+});
+
+test('picker shows only the Windows option and a busy bar until the applications arrive', async t => {
+  let finish;
+  const { calls, run } = activate(t, { list: () => new Promise(resolve => { finish = resolve; }) });
+  const done = run();
+  await tick();
+  const picker = calls.pickers[0];
+  assert.equal(picker.busy, true);
+  assert.deepEqual(picker.items.map(item => item.label), ['Choose Another Application in Windows\u2026']);
+  finish([{ name: 'Editor', id: 'editor', recommended: true }]);
+  await tick();
+  assert.equal(picker.busy, false);
+  assert.deepEqual(picker.items.map(item => item.label), ['Editor', '', 'Refresh Applications', 'Choose Another Application in Windows\u2026']);
+  picker.hide();
+  await done;
+});
+
+test('Refresh Applications keeps the picker open, shows the busy bar and replaces the list', async t => {
+  let queries = 0, finish;
+  const first = [{ name: 'Old', id: 'old', recommended: true }];
+  const { calls, run } = activate(t, { list: (_file, _signal, force) => {
+    queries++;
+    return force ? new Promise(resolve => { finish = resolve; }) : Promise.resolve(first);
+  } });
+  const done = run();
+  await tick(); await tick();
+  const picker = calls.pickers[0];
+  picker.accept(picker.items.find(item => item.label === 'Refresh Applications'));
+  await tick();
+  assert.equal(picker.busy, true);
+  assert.equal(calls.pickers.length, 1);
+  finish([{ name: 'New', id: 'new', recommended: true }]);
+  await tick();
+  assert.equal(picker.busy, false);
+  assert.equal(picker.items[0].label, 'New');
+  assert.equal(queries, 2);
+  picker.hide();
+  await done;
 });
 
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -105,7 +159,7 @@ test('startup preloads only configured formats found in local workspace folders'
   await tick(); await tick();
   assert.deepEqual(calls.files, ['C:\\project\\report.DOCX', 'C:\\project\\file.pdf']);
   assert.equal(calls.scans, 1);
-  assert.equal(calls.picks.length, 0);
+  assert.equal(calls.pickers.length, 0);
   assert.equal(calls.info.length, 0);
   assert.equal(calls.errors.length, 0);
 });
@@ -141,7 +195,7 @@ test('foreground command interrupts preload before its own query', async t => {
   const events = [];
   let started;
   const ready = new Promise(resolve => { started = resolve; });
-  const { run } = activate(t, { list: async (file, signal) => {
+  const { calls, run } = activate(t, { list: async (file, signal) => {
     if (file.endsWith('report.txt')) { events.push('foreground'); return [{ name: 'Editor', id: 'editor', recommended: true }]; }
     events.push('background'); started();
     await new Promise((_resolve, reject) => signal.addEventListener('abort', async () => {
@@ -151,7 +205,10 @@ test('foreground command interrupts preload before its own query', async t => {
   await tick();
   assert.ok(events.includes('background'));
   await ready;
-  await run();
+  const done = run();
+  for (let i = 0; i < 6; i++) await tick();
+  calls.pickers[0].hide();
+  await done;
   assert.deepEqual(events.slice(0, 3), ['background', 'drained', 'foreground']);
 });
 
@@ -166,33 +223,122 @@ test('cache setting defaults to five minutes and changes clear cached applicatio
   assert.equal(calls.clears, 1);
 });
 
-test('busy command explains the pending operation and becomes available afterward', async t => {
-  let finish;
-  const { calls, run } = activate(t, { list: () => new Promise(resolve => { finish = resolve; }) });
+test('busy command explains the pending operation while the picker is open and becomes available afterward', async t => {
+  const { calls, run } = activate(t);
   const first = run();
-  await new Promise(resolve => setImmediate(resolve));
+  await tick(); await tick();
   await run();
   assert.match(calls.info[0], /already/);
-  finish([{ name: 'Editor', id: 'editor', recommended: true }]);
+  calls.pickers[0].hide();
   await first;
+  const second = run();
+  await tick(); await tick();
+  assert.equal(calls.info.length, 1);
+  assert.equal(calls.pickers.length, 2);
+  calls.pickers[1].hide();
+  await second;
 });
 
-test('progress cancellation reaches discovery and releases the command guard', async t => {
-  let attempts = 0;
-  const { calls, run, cancel } = activate(t, { list: async (_file, signal) => {
-    attempts++;
-    if (attempts === 1) return new Promise((_resolve, reject) => {
-      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
-    });
+test('closing the picker while the query runs releases the command guard and keeps the query alive', async t => {
+  let finish, signalSeen = 'unset';
+  const { calls, run } = activate(t, { list: (_file, signal) => { signalSeen = signal; return new Promise(resolve => { finish = resolve; }); } });
+  const first = run();
+  await tick();
+  calls.pickers[0].hide();
+  await first;
+  assert.equal(signalSeen, undefined);
+  const second = run();
+  await tick(); await tick();
+  assert.equal(calls.info.length, 0);
+  assert.equal(calls.pickers.length, 2);
+  finish([{ name: 'Editor', id: 'editor', recommended: true }]);
+  await tick();
+  calls.pickers[1].hide();
+  await second;
+  assert.equal(calls.errors.length, 0);
+});
+
+const pdfTab = { uri: { scheme: 'file', fsPath: 'C:\\docs\\report.PDF' } };
+const warmed = async (t, overrides, settings) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const result = activate(t, overrides, { tab: pdfTab, ...settings });
+  result.tabsChange?.call();
+  t.mock.timers.tick(300);
+  await tick();
+  return result;
+};
+
+test('the active tab format is warmed after a short pause, including non-text editors', async t => {
+  const { calls, tabsChange } = await warmed(t);
+  assert.deepEqual(calls.files, ['C:\\docs\\report.PDF']);
+  tabsChange(); tabsChange();
+  t.mock.timers.tick(299);
+  assert.equal(calls.files.length, 1);
+  t.mock.timers.tick(1);
+  assert.equal(calls.files.length, 2, 'rapid tab changes produce one query');
+});
+
+for (const [name, overrides, settings] of [
+  ['a fresh cached list', { getCached: () => [{}] }, {}],
+  ['zero cache duration', {}, { config: { cacheDurationMinutes: 0 } }],
+  ['preloading disabled', {}, { config: { preloadEnabled: false } }],
+  ['a non-file tab', {}, { tab: { uri: { scheme: 'untitled', fsPath: 'Untitled-1.txt' } } }],
+  ['an extensionless file', {}, { tab: { uri: { scheme: 'file', fsPath: 'C:\\docs\\LICENSE' } } }],
+  ['a tab without a file', {}, { tab: {} }],
+  ['non-Windows', {}, { platform: 'linux' }]
+]) test(`tab warming is skipped for ${name}`, async t => {
+  const { calls } = await warmed(t, overrides, settings);
+  assert.equal(calls.lists, 0);
+});
+
+test('a failed warming query is silent', async t => {
+  const { calls } = await warmed(t, { list: async () => { throw new Error('blocked'); } });
+  assert.equal(calls.errors.length, 0);
+  assert.equal(calls.info.length, 0);
+});
+
+test('tab warming is skipped for formats outside the configured list', async t => {
+  const { calls } = await warmed(t, {}, { tab: { uri: { scheme: 'file', fsPath: 'C:\docs\archive.zip' } } });
+  assert.equal(calls.lists, 0);
+});
+
+test('nothing is queried at startup when the window opens', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { calls } = activate(t, {}, { tab: pdfTab });
+  t.mock.timers.tick(1000);
+  await tick();
+  assert.equal(calls.lists, 0);
+});
+
+test('Enter on the Windows option is ignored while loading with typed text, but works with an empty search', async t => {
+  let finish;
+  const { calls, run } = activate(t, { list: () => new Promise(resolve => { finish = resolve; }) });
+  const done = run();
+  await tick();
+  const picker = calls.pickers[0];
+  picker.value = 'word';
+  picker.accept(picker.items[0]);
+  await tick();
+  assert.equal(calls.pickers.length, 1);
+  picker.value = '';
+  picker.accept(picker.items[0]);
+  assert.equal(await done, undefined);
+  finish([]);
+});
+
+test('a failed explicit refresh keeps the list and reports the failure', async t => {
+  const { calls, run } = activate(t, { list: async (_file, _signal, force) => {
+    if (force) throw new Error('policy blocked');
     return [{ name: 'Editor', id: 'editor', recommended: true }];
   } });
-  const pending = run();
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(calls.progress.cancellable, true);
-  cancel();
-  await pending;
-  await run();
-  assert.equal(attempts, 2);
-  assert.equal(calls.errors.length, 0);
-  assert.equal(calls.disposed, 2);
+  const done = run();
+  await tick(); await tick();
+  const picker = calls.pickers[0];
+  picker.accept(picker.items.find(item => item.label === 'Refresh Applications'));
+  await tick(); await tick();
+  assert.equal(picker.busy, false);
+  assert.equal(picker.items[0].label, 'Editor');
+  assert.match(calls.errors[0], /policy blocked/);
+  picker.hide();
+  await done;
 });

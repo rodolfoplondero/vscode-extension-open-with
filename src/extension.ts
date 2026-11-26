@@ -1,12 +1,32 @@
 import * as vscode from 'vscode';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { runOpenExternal, Choice, FileTarget, Host } from './command';
+import { runOpenExternal, Choice, FileTarget, Host, PickerSession } from './command';
+import type { App } from './windows';
 import { WindowsBridge } from './windows';
-import { defaultPreloadExtensions, Preloader } from './preload';
+import { defaultPreloadExtensions, normalizeExtensions, Preloader } from './preload';
 import { scanWorkspace } from './workspace';
 
-interface AppItem extends vscode.QuickPickItem { choice?: Choice }
+interface AppItem extends vscode.QuickPickItem { choice?: Choice | { kind: 'refresh' } }
+
+function buildItems(apps: App[]): AppItem[] {
+  const nameCounts = new Map<string, number>();
+  for (const app of apps) {
+    const name = app.name.toLocaleLowerCase();
+    nameCounts.set(name, (nameCounts.get(name) ?? 0) + 1);
+  }
+  const items: AppItem[] = apps.map(app => ({
+    label: app.name,
+    description: nameCounts.get(app.name.toLocaleLowerCase())! > 1 ? app.id : undefined,
+    choice: { kind: 'app', app }
+  }));
+  if (apps.length > 0) {
+    items.push({ label: '', kind: vscode.QuickPickItemKind.Separator });
+    items.push({ label: 'Refresh Applications', alwaysShow: true, choice: { kind: 'refresh' } });
+  }
+  items.push({ label: 'Choose Another Application in Windows…', alwaysShow: true, choice: { kind: 'native' } });
+  return items;
+}
 
 export function activate(context: vscode.ExtensionContext): void {
   const bridge = new WindowsBridge(context.extensionPath, undefined, () =>
@@ -24,6 +44,29 @@ export function activate(context: vscode.ExtensionContext): void {
     if (event.affectsConfiguration('openWithExternal.cacheDurationMinutes')) bridge.clearCache();
     if (['openWithExternal', 'files.exclude', 'search.exclude'].some(key => event.affectsConfiguration(key))) restartPreloading();
   }));
+  const warmingEnabled = () => {
+    const config = vscode.workspace.getConfiguration('openWithExternal');
+    return process.platform === 'win32' && config.get<boolean>('preloadEnabled', true)
+      && config.get<number>('cacheDurationMinutes', 5) > 0;
+  };
+  // Query the active tab's format ahead of time (configured formats only) so the picker usually finds a fresh list.
+  const warmActiveTab = () => {
+    if (!warmingEnabled()) return;
+    const input = vscode.window.tabGroups?.activeTabGroup?.activeTab?.input as { uri?: vscode.Uri } | undefined;
+    const uri = input?.uri;
+    if (uri?.scheme !== 'file' || bridge.getCached(uri.fsPath)) return;
+    const configured = normalizeExtensions(vscode.workspace.getConfiguration('openWithExternal')
+      .get<string[]>('preloadExtensions', defaultPreloadExtensions));
+    if (!configured.includes(path.win32.extname(uri.fsPath).toLowerCase())) return;
+    bridge.list(uri.fsPath).catch(() => { /* Warming is best effort and never shows an error. */ });
+  };
+  let warmTimer: ReturnType<typeof setTimeout> | undefined;
+  const scheduleWarming = () => {
+    clearTimeout(warmTimer);
+    warmTimer = setTimeout(warmActiveTab, 300);
+  };
+  const tabSubscription = vscode.window.tabGroups?.onDidChangeTabs(scheduleWarming);
+  context.subscriptions.push({ dispose: () => { clearTimeout(warmTimer); tabSubscription?.dispose(); } });
   const host: Host = {
     platform: process.platform,
     activeFile: () => vscode.window.activeTextEditor?.document.uri,
@@ -44,36 +87,44 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       return choice === disk;
     },
-    pick: async (apps, filePath) => {
-      const nameCounts = new Map<string, number>();
-      for (const app of apps) {
-        const name = app.name.toLocaleLowerCase();
-        nameCounts.set(name, (nameCounts.get(name) ?? 0) + 1);
-      }
-      const items: AppItem[] = apps.map(app => ({
-        label: app.name,
-        description: nameCounts.get(app.name.toLocaleLowerCase())! > 1 ? app.id : undefined,
-        choice: { kind: 'app', app }
-      }));
-      items.push({ label: '', kind: vscode.QuickPickItemKind.Separator });
-      items.push({ label: 'Refresh Applications', alwaysShow: true, choice: { kind: 'refresh' } });
-      items.push({ label: 'Choose Another Application in Windows…', alwaysShow: true, choice: { kind: 'native' } });
-      const chosen = await vscode.window.showQuickPick(items, {
-        title: `Open ${path.win32.basename(filePath)} With…`,
-        placeHolder: 'Search for and select an application',
-        matchOnDescription: false, matchOnDetail: false, ignoreFocusOut: false
+    openPicker: (filePath, initialApps, busy, onRefresh) => {
+      const picker = vscode.window.createQuickPick<AppItem>();
+      picker.title = `Open ${path.win32.basename(filePath)} With…`;
+      picker.placeholder = 'Search for and select an application';
+      picker.matchOnDescription = false;
+      picker.matchOnDetail = false;
+      picker.ignoreFocusOut = false;
+      picker.busy = busy;
+      const render = (apps: App[]) => {
+        const identity = (item?: AppItem) => item?.choice?.kind === 'app' ? item.choice.app.id : item?.choice?.kind;
+        const activeId = identity(picker.activeItems[0]);
+        const items = buildItems(apps);
+        picker.items = items;
+        const active = activeId === undefined ? undefined : items.find(item => identity(item) === activeId);
+        if (active) picker.activeItems = [active];
+      };
+      render(initialApps);
+      const result = new Promise<Choice | undefined>(resolve => {
+        picker.onDidAccept(() => {
+          const choice = (picker.selectedItems[0] ?? picker.activeItems[0])?.choice;
+          if (!choice) return;
+          if (choice.kind === 'refresh') { onRefresh(); return; }
+          // While the list loads, typing filters down to the Windows option; Enter must not launch it by accident.
+          if (choice.kind === 'native' && picker.busy && picker.value.trim() !== '') return;
+          resolve(choice);
+          picker.hide();
+        });
+        picker.onDidHide(() => { resolve(undefined); picker.dispose(); });
       });
-      return chosen?.choice;
+      picker.show();
+      const session: PickerSession = {
+        result,
+        setApps: render,
+        setBusy: value => { picker.busy = value; },
+        hide: () => picker.hide()
+      };
+      return session;
     },
-    progress: async task => await vscode.window.withProgress({
-      location: vscode.ProgressLocation.Notification, title: 'Querying Windows applications…', cancellable: true
-    }, async (_progress, token) => {
-      const controller = new AbortController();
-      const subscription = token.onCancellationRequested(() => controller.abort());
-      if (token.isCancellationRequested) controller.abort();
-      try { return await task(controller.signal); }
-      finally { subscription.dispose(); }
-    }),
     offerNative: async message => {
       const action = 'Open With Windows…';
       return await vscode.window.showWarningMessage(message, action) === action;
