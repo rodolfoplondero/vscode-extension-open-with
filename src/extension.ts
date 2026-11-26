@@ -81,7 +81,7 @@ export function activate(context: vscode.ExtensionContext): void {
     error: async message => { await vscode.window.showErrorMessage(message); }
   };
   let running = false;
-  context.subscriptions.push(vscode.commands.registerCommand('abrirComExterno.open', async (uri?: vscode.Uri) => {
+  context.subscriptions.push(vscode.commands.registerCommand('openWithExternal.open', async (uri?: vscode.Uri) => {
     if (running) {
       await vscode.window.showInformationMessage(
         'An Open With operation is already in progress. Finish or dismiss the application picker or Windows dialog, or cancel the application query.');

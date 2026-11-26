@@ -6,7 +6,9 @@ const Module = require('node:module');
 const root = path.resolve(process.argv[2]);
 const manifest = require(path.join(root, 'package.json'));
 assert.equal(manifest.version, require('../package.json').version);
-assert.equal(manifest.publisher + '.' + manifest.name, 'local-tools.abrir-com-externo');
+assert.equal(manifest.publisher + '.' + manifest.name, 'rodolfoplondero.open-with-external');
+assert.equal(manifest.author.name, 'Rodolfo Londero');
+assert.equal(manifest.repository.url, 'https://github.com/rodolfoplondero/vscode-extension-open-with.git');
 assert.ok(manifest.activationEvents.includes('onStartupFinished'));
 const settings = manifest.contributes.configuration.properties;
 assert.equal(settings['openWithExternal.preloadEnabled'].default, true);
@@ -19,6 +21,7 @@ for (const name of ['.github', 'test', 'docs', 'TRACKER.md', 'node_modules/types
   assert.equal(fs.existsSync(path.join(root, name)), false, `Development file shipped: ${name}`);
 }
 const noOpSubscription = () => ({ dispose() {} });
+const registeredCommands = [];
 const vscode = {
   workspace: {
     workspaceFolders: [],
@@ -26,7 +29,7 @@ const vscode = {
     onDidChangeWorkspaceFolders: noOpSubscription,
     onDidChangeConfiguration: noOpSubscription
   },
-  commands: { registerCommand: noOpSubscription }, window: {}
+  commands: { registerCommand: id => { registeredCommands.push(id); return noOpSubscription(); } }, window: {}
 };
 const originalLoad = Module._load;
 Module._load = function(id, parent, isMain) {
@@ -36,6 +39,7 @@ Module._load = function(id, parent, isMain) {
 try {
   const context = { extensionPath: root, subscriptions: [] };
   require(path.join(root, 'dist/extension.js')).activate(context);
+  assert.deepEqual(registeredCommands, ['openWithExternal.open']);
   context.subscriptions.forEach(item => item.dispose());
 } finally { Module._load = originalLoad; }
 console.log('Isolated VSIX: settings verified; activation succeeded with mocked VS Code API; production dependencies resolved inside package.');

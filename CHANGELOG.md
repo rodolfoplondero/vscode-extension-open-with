@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0 — 2026-11-26
+
+- Rename the extension identity to `rodolfoplondero.open-with-external` and its command to `openWithExternal.open` so current identifiers and settings instructions are in English.
+- Credit the author in package metadata and prepare publication under the author's publisher namespace on Visual Studio Marketplace and Open VSX.
+- Update menus, package metadata, tests, and the Settings search filter to the new identity.
+- Require uninstalling the previous 0.1.x extension before installing this version. Existing `openWithExternal.*` settings remain compatible; custom command bindings must be updated.
+
 ## 0.1.7 — 2026-11-26
 
 - Preload application lists after startup for configured formats present in local workspace folders.

@@ -33,7 +33,7 @@ function activate(t, overrides = {}, settings = {}) {
       onDidChangeWorkspaceFolders: callback => { onFoldersChange = callback; return { dispose() {} }; },
       onDidChangeConfiguration: callback => { onConfigurationChange = callback; return { dispose() {} }; }
     },
-    commands: { registerCommand: (_id, callback) => { command = callback; return { dispose() {} }; } },
+    commands: { registerCommand: (id, callback) => { calls.commandId = id; command = callback; return { dispose() {} }; } },
     window: {
       showQuickPick: async (items, options) => { calls.picks.push({ items, options }); },
       showInformationMessage: async message => { calls.info.push(message); },
@@ -69,6 +69,17 @@ function activate(t, overrides = {}, settings = {}) {
     foldersChange: () => onFoldersChange(),
     configurationChange: relevant => onConfigurationChange({ affectsConfiguration: () => relevant }) };
 }
+
+test('English extension identity and command agree across manifest, menus and registration', t => {
+  const manifest = require('../package.json');
+  const { calls } = activate(t);
+  assert.equal(manifest.publisher + '.' + manifest.name, 'rodolfoplondero.open-with-external');
+  assert.equal(calls.commandId, 'openWithExternal.open');
+  assert.equal(manifest.contributes.commands[0].command, calls.commandId);
+  for (const menu of Object.values(manifest.contributes.menus)) {
+    for (const item of menu) assert.equal(item.command, calls.commandId);
+  }
+});
 
 test('picker keeps the Windows escape route visible and searches names only', async t => {
   const { calls, run } = activate(t);
