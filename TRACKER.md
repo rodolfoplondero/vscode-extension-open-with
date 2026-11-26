@@ -89,7 +89,7 @@ _Nothing here._
 - **Opened:** 2026-11-26 · **Done:** 2026-11-26
 - **Description:** Add configurable background preloading for common file formats present in local workspace folders.
 - **Done when:** The design is approved, implementation checks pass, and a current VSIX is available for manual installation.
-- **Deliverables:** [Approved design](docs/superpowers/specs/2026-11-26-application-preload-design.md), [Settings](README.md#background-preloading), [Installable VSIX](open-with-external-0.1.7.vsix)
+- **Deliverables:** [Approved design](docs/superpowers/specs/2026-11-26-application-preload-design.md), [Settings](README.md#background-preloading), [GitHub release](https://github.com/rodolfoplondero/vscode-extension-open-with/releases/tag/v0.1.7), [Release notes](docs/releases/v0.1.7.md), [PR](https://github.com/rodolfoplondero/vscode-extension-open-with/pull/1)
 - **Blocker:** —
 
 **Subtasks**
@@ -114,3 +114,4 @@ _Nothing here._
 - 2026-11-26 · OWE-004 · Progress · User approved the design; implemented background scanning and foreground priority on dev.
 - 2026-11-26 · OWE-004 · Done · All 60 tests passed; version 0.1.7 package and isolated simulated activation verified.
 - 2026-11-26 · OWE-004 · Progress · Revalidated all 60 tests and prepared the dev changes for commit and pull request.
+- 2026-11-26 · OWE-004 · Progress · Opened PR 1 and published release v0.1.7 with a verified VSIX from dev; main unchanged.
