@@ -22,7 +22,22 @@ Last updated: 2026-11-26
 
 ## Doing
 
-_Nothing here._
+### OWE-008 · Add a demo GIF to the README
+
+- **Status:** Doing
+- **Opened:** 2026-11-26 · **Done:** —
+- **Description:** Show how the extension is used in the README with one demo GIF recorded in VS Code.
+- **Done when:** docs/media/demo.gif is committed and displays in the README on GitHub.
+- **Deliverables:** [README](README.md), [Demo GIF](docs/media/demo.gif)
+- **Blocker:** —
+
+**Subtasks**
+
+- [x] OWE-008.1 Add image sections and links to the README
+- [x] OWE-008.2 Write the shot list and create sample files to record
+- [x] OWE-008.3 Record the demo GIF and save it in docs/media
+- [ ] OWE-008.4 Commit the GIF and check the README on GitHub (In progress)
+
 
 ---
 
@@ -175,3 +190,5 @@ _Nothing here._
 - 2026-11-26 · OWE-006 · Opened · Committed the 0.2.0 identity rename on dev; 61 tests passed.
 - 2026-11-26 · OWE-006 · Done · PR 2 merged, tag v0.2.0 pushed; GitHub release published the verified VSIX.
 - 2026-11-26 · OWE-007 · Opened · Store publication pending Marketplace and Open VSX account setup.
+- 2026-11-26 · OWE-008 · Opened · README now links screenshots and GIFs; shot list and sample files ready for recording.
+- 2026-11-26 · OWE-008 · Progress · Scope reduced to one demo GIF; extra screenshots removed from the README.
