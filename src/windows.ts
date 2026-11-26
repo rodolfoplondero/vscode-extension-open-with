@@ -4,11 +4,12 @@ import { isCompatibleHandler } from './compatibility';
 
 export interface App { id: string; name: string; recommended: boolean }
 export interface BridgeRequest { action: 'list' | 'open' | 'native'; filePath: string; handlerId?: string }
-export type Runner = (request: BridgeRequest) => Promise<string>;
+export type Runner = (request: BridgeRequest, signal?: AbortSignal) => Promise<string>;
 type Spawner = (command: string, args: string[], options: SpawnOptions) => ChildProcess;
 
 export function createPowerShellRunner(extensionPath: string, spawnProcess: Spawner = spawn): Runner {
-  return request => new Promise((resolve, reject) => {
+  return (request, signal) => new Promise((resolve, reject) => {
+    signal?.throwIfAborted();
     // Only the packaged script is executable text. File paths and IDs go through stdin.
     const systemRoot = process.env.SystemRoot || 'C:\\Windows';
     const executable = path.win32.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
@@ -17,11 +18,16 @@ export function createPowerShellRunner(extensionPath: string, spawnProcess: Spaw
       '-File', path.join(extensionPath, 'scripts', 'bridge.ps1')
     ], {
       shell: false, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: request.action === 'native' ? 0 : 30_000
+      timeout: request.action === 'native' ? 0 : 30_000, signal
     });
     let stdout = '', stderr = '', length = 0;
-    child.on('error', reject);
-    child.stdin?.on('error', reject);
+    let cancellation: Error | undefined;
+    child.on('error', error => {
+      // On abort, Node emits error before close. Drain before the next query.
+      if (error.name === 'AbortError') cancellation = error;
+      else reject(error);
+    });
+    child.stdin?.on('error', error => { if (!signal?.aborted) reject(error); });
     child.stdout?.setEncoding('utf8');
     child.stderr?.setEncoding('utf8');
     const collect = (chunk: string, errorStream: boolean) => {
@@ -36,6 +42,7 @@ export function createPowerShellRunner(extensionPath: string, spawnProcess: Spaw
     child.stdout?.on('data', chunk => collect(chunk, false));
     child.stderr?.on('data', chunk => collect(chunk, true));
     child.on('close', (code, signal) => {
+      if (cancellation) { reject(cancellation); return; }
       if (code !== 0) {
         reject(new Error(signal
           ? 'The Windows query was interrupted or exceeded 30 seconds.'
@@ -48,12 +55,39 @@ export function createPowerShellRunner(extensionPath: string, spawnProcess: Spaw
 
 export class WindowsBridge {
   private readonly run: Runner;
-  constructor(extensionPath: string, runner?: Runner) {
+  private readonly cache = new Map<string, { apps: App[]; savedAt: number }>();
+  constructor(
+    extensionPath: string, runner?: Runner,
+    private readonly cacheMinutes: () => number = () => 0,
+    private readonly now: () => number = Date.now
+  ) {
     this.run = runner ?? createPowerShellRunner(extensionPath);
   }
-  async list(filePath: string): Promise<App[]> {
+  getCached(filePath: string): App[] | undefined {
+    const key = path.win32.extname(filePath).toLowerCase();
+    const entry = this.cache.get(key);
+    if (!entry) return undefined;
+    const minutes = this.cacheMinutes();
+    if (!Number.isFinite(minutes) || minutes <= 0 || this.now() - entry.savedAt >= minutes * 60_000) {
+      this.cache.delete(key);
+      return undefined;
+    }
+    return entry.apps.map(app => ({ ...app }));
+  }
+  invalidate(filePath: string): void {
+    this.cache.delete(path.win32.extname(filePath).toLowerCase());
+  }
+  clearCache(): void { this.cache.clear(); }
+  async list(filePath: string, signal?: AbortSignal): Promise<App[]> {
+    signal?.throwIfAborted();
+    const cached = this.getCached(filePath);
+    if (cached) return cached;
     let parsed: unknown;
-    try { parsed = JSON.parse(await this.run({ action: 'list', filePath })); }
+    try {
+      const response = await this.run({ action: 'list', filePath }, signal);
+      signal?.throwIfAborted();
+      parsed = JSON.parse(response);
+    }
     catch (error) {
       if (error instanceof SyntaxError) throw new Error('Invalid response from Windows.');
       throw error;
@@ -67,16 +101,28 @@ export class WindowsBridge {
     for (const item of parsed as App[]) {
       if (item.recommended && isCompatibleHandler(filePath, item.id) && !unique.has(item.id)) unique.set(item.id, item);
     }
-    return [...unique.values()].sort((a, b) =>
+    const apps = [...unique.values()].sort((a, b) =>
       Number(b.recommended) - Number(a.recommended) || a.name.localeCompare(b.name, 'en') || a.id.localeCompare(b.id));
+    const key = path.win32.extname(filePath).toLowerCase();
+    const minutes = this.cacheMinutes();
+    if (key && apps.length > 0 && Number.isFinite(minutes) && minutes > 0) {
+      this.cache.set(key, { apps: apps.map(app => ({ ...app })), savedAt: this.now() });
+    }
+    return apps;
   }
   async open(filePath: string, handlerId: string): Promise<void> {
-    if (!isCompatibleHandler(filePath, handlerId)) {
-      throw new Error('The selected application is not a recognized DOCX document editor.');
+    try {
+      if (!isCompatibleHandler(filePath, handlerId)) {
+        throw new Error('The selected application is not a recognized DOCX document editor.');
+      }
+      await this.run({ action: 'open', filePath, handlerId });
+    } catch (error) {
+      this.invalidate(filePath);
+      throw error;
     }
-    await this.run({ action: 'open', filePath, handlerId });
   }
   async native(filePath: string): Promise<void> {
-    await this.run({ action: 'native', filePath });
+    try { await this.run({ action: 'native', filePath }); }
+    finally { this.invalidate(filePath); }
   }
 }

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Usability review — Open With External Application</title>
+<style>
+:root{--bg:#fff;--fg:#1f2328;--muted:#656d76;--line:#d0d7de;--side:#f6f8fa;--accent:#0969da;--code:#f6f8fa;--hit:#fff8c5}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1117;--fg:#e6edf3;--muted:#8d96a0;--line:#30363d;--side:#161b22;--accent:#4493f8;--code:#161b22;--hit:#5a4a00}}
+:root[data-theme="dark"]{--bg:#0d1117;--fg:#e6edf3;--muted:#8d96a0;--line:#30363d;--side:#161b22;--accent:#4493f8;--code:#161b22;--hit:#5a4a00}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 Segoe UI,system-ui,sans-serif}
+header{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;padding:8px 16px;background:var(--side);border-bottom:1px solid var(--line)}
+header .t{font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+header input{padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);width:200px;max-width:40vw}
+header button{padding:4px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);cursor:pointer}
+.wrap{display:flex}
+nav{position:sticky;top:45px;height:calc(100vh - 45px);overflow:auto;width:280px;flex:none;padding:12px;border-right:1px solid var(--line);background:var(--side);font-size:13px}
+nav a{display:block;color:var(--fg);text-decoration:none;padding:2px 4px;border-radius:4px}
+nav a:hover,nav a.on{background:var(--line)}
+nav .l3{padding-left:16px;color:var(--muted)} nav .l4{padding-left:28px;color:var(--muted)}
+main{flex:1;min-width:0;max-width:980px;padding:16px 32px 64px}
+main h1,main h2,main h3,main h4{scroll-margin-top:56px}
+main h2,main h3{cursor:pointer;border-bottom:1px solid var(--line);padding-bottom:4px}
+main h2::before,main h3::before{content:"▾ ";color:var(--muted);font-size:.8em}
+main .closed::before{content:"▸ "}
+table{border-collapse:collapse;display:block;overflow-x:auto;margin:12px 0}
+th,td{border:1px solid var(--line);padding:6px 10px;vertical-align:top}
+th{background:var(--side)}
+code{background:var(--code);padding:1px 4px;border-radius:4px;font-size:.9em}
+pre{background:var(--code);padding:12px;border-radius:6px;overflow:auto}
+pre code{padding:0}
+img{max-width:100%;cursor:zoom-in;border:1px solid var(--line);border-radius:4px}
+img.zoom{position:fixed;inset:0;margin:auto;max-width:96vw;max-height:96vh;z-index:9;cursor:zoom-out;background:var(--bg);box-shadow:0 0 0 100vmax rgba(0,0,0,.6)}
+a{color:var(--accent)}
+blockquote{margin:0;padding:0 12px;border-left:4px solid var(--line);color:var(--muted)}
+mark{background:var(--hit);color:inherit}
+.hidden{display:none!important}
+footer{color:var(--muted);font-size:12px;margin-top:32px}
+@media (max-width:800px){nav{display:none}main{padding:16px}}
+</style>
+</head>
+<body>
+<header>
+  <span class="t">__TITLE__</span>
+  <input id="q" type="search" placeholder="Filter sections…">
+  <button id="all" title="Expand / collapse all">⇕</button>
+  <button id="theme" title="Toggle theme">◐</button>
+</header>
+<div class="wrap"><nav id="toc"></nav><main id="doc"></main></div>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script type="module">
+const md = "# Usability review — Open With External Application\n\nReviewed: 2026-11-26 · Version: 0.1.4\n\nThe extension has a short main workflow, clear entry points in the Explorer and editor, a save-before-opening prompt, and a native Windows fallback. The most useful improvements address search recovery, waiting states, and launch failures.\n\nThis is a source and automated-test review. No VS Code Extension Development Host or native Windows application launch was exercised. The recommendations below distinguish source findings from proposed enhancements.\n\n## Findings, in recommended order\n\n### 1. Keep the Windows fallback available during search\n\nPriority: P2 · Source: `src/extension.ts:38–44`\n\nThe native fallback is a normal Quick Pick item. Searching for an application that is absent from the list also filters out “Choose Another Application in Windows…” unless its text matches the query. This hides the escape route precisely when users need another application.\n\nSet `alwaysShow: true` on the fallback item. Verify that searching for an unlisted editor still leaves the fallback visible and selectable with the keyboard.\n\n### 2. Explain busy states and allow cancellation of discovery\n\nPriority: P2 · Sources: `src/extension.ts:47–61`, `src/windows.ts:20`\n\nDiscovery shows a non-cancellable notification and can take up to 30 seconds. Every command invoked during an existing operation returns silently. The native dialog has no timeout, so this guard lasts until the dialog closes. A user who returns to VS Code and invokes the command again receives no explanation.\n\nAdd cancellation for discovery and propagate it to the child process. When an operation is already active, show a short explanation, including a reminder to finish or close the Windows dialog when appropriate. Retain the concurrency guard and avoid imposing a timeout on a dialog awaiting user input.\n\nVerify cancelling discovery, retrying afterward, and invoking the command while the native dialog is open. Native focus behavior needs a live Windows check.\n\n### 3. Offer recovery after an application fails to open\n\nPriority: P2 · Source: `src/command.ts:50–55`\n\nDiscovery failures offer the Windows dialog, but launch failures only display an error. If an association changes while the picker is open, the user must start again and rediscover the workflow.\n\nOffer “Choose Another Application…” or “Try Again” after a failed launch. Keep the file target, retain diagnostic details, and require an explicit choice before attempting another launch.\n\nVerify with a removed handler, an application launch error, and cancellation of the recovery prompt.\n\n### 4. Simplify picker rows and improve search relevance\n\nPriority: P3 · Sources: `src/extension.ts:32–43`, `src/windows.ts:68–71`\n\nEvery listed application is recommended, so “Recommended by Windows” repeats on every row. Raw handler IDs appear as details and participate in searching; a query can therefore match a technical path rather than the application name. IDs can still be useful to distinguish duplicate names.\n\nLead with the application name, show a readable publisher or executable name only where needed, and keep full handler details available for diagnostics. Prefer name-based matching. Verify duplicate display names, long installation paths, and keyboard navigation.\n\n### 5. Explain why a DOCX editor may be missing\n\nPriority: P3 · Sources: `src/command.ts:43–45`, `src/compatibility.ts:6–17`\n\nThe DOCX allowlist deliberately omits unknown editors. The generic “No supported applications were found” message can imply that no capable editor is installed, although one may simply be unrecognized. The README explains this distinction, but the prompt does not.\n\nUse wording such as “No recognized DOCX editors were found. Choose an application using Windows.” Preserve the conservative filter and the explicit native choice.\n\nVerify empty lists for DOCX and other formats separately.\n\n## Optional enhancements\n\n- Remember the last successfully used application per file extension and place it first. Label it “Last used”; do not change Windows defaults. Revalidate that the handler is still available.\n- Add a separate “Open with Last Used Application” command that users can bind to a shortcut. Keep the existing picker command predictable.\n- Consider multi-file opening only after deciding how mixed file types and partial failures should behave. The current command callback accepts one URI and does not implement batch processing.\n- Measure discovery time on Windows before adding caching. Every request starts PowerShell and loads C# through `Add-Type`; this is a potential source of delay, not a measured performance result. If caching proves useful, provide refresh and invalidate stale handlers.\n\n## Validation\n\n`npm test` passed: TypeScript compilation and 25 tests, zero failures. Dependencies were installed with `npm ci --ignore-scripts --no-audit --no-fund`.\n\nExisting tests cover validation, cancellation in the command abstraction, fallback selection, handler filtering, transport errors, and timeouts. They do not cover actual Quick Pick filtering, focus behavior, save-prompt buttons, or the native Windows application lifecycle. Add targeted adapter or Extension Host coverage when changing those flows, and perform a Windows smoke test before Marketplace release.\n\nApplication code and package metadata were not changed during this review.\n\n## Marketplace preparation\n\nThe manifest currently uses publisher `local-tools`. Confirm ownership or replace it with the registered publisher ID before packaging. A different publisher changes the full extension identifier.\n\nFor a first release, create a publisher in the Marketplace management portal, build the VSIX with `npm run package`, and upload it manually. A repository URL, icon, screenshots, keywords, and a changelog would improve the listing; the missing repository URL is not itself a publication blocker.\n\nFor subsequent automated releases, prefer Trusted Publishing with GitHub Actions. Review the installed vsce version against the current publishing requirements before configuring it.\n\nOfficial guide: https://code.visualstudio.com/api/working-with-extensions/publishing-extension\n\nNo Marketplace upload or public release was performed.\n\n## Implementation follow-up — version 0.1.5\n\nAll five findings were addressed after the user requested the adjustments and an installable VSIX. The fallback item stays visible during search; discovery accepts cancellation through an AbortSignal; concurrent commands explain the pending operation; launch failures offer the native dialog; and the picker and empty-list messages were simplified. Duplicate application names retain handler identities to distinguish installations. Optional enhancements remain deferred.\n\nNine new regression tests failed before implementation and passed afterward. Final validation: TypeScript compilation and all 34 tests passed; `npm run package` generated `open-with-external-0.1.5.vsix`. Archive inspection confirmed the version, unchanged extension identifier, all four current compiled modules, both Windows scripts, and exclusion of development tracking and test files. Live Extension Host and native Windows window behavior still require manual validation.\n\n## Cache follow-up — version 0.1.6\n\nThe user requested a configurable discovery cache. Version 0.1.6 adds `openWithExternal.cacheDurationMinutes` (default 5, 0 disables), per-extension session reuse, a Refresh Applications picker action, and invalidation on setting changes, launch errors and completion of the native dialog. Cache hits skip discovery progress. Empty results, failures and cancelled queries are not cached. This addresses the caching enhancement above; no timing benchmark or live window validation was performed.\n\nWork continued on the user-requested `dev` branch, with no commits. Compilation and all 41 tests passed. The generated VSIX was inspected to verify its settings schema, version and current compiled modules and Windows scripts.\n";
+const doc = document.getElementById("doc");
+doc.innerHTML = marked.parse(md, { gfm: true }) +
+  '<footer>Generated from usability-review-2026-11-26.md · 2026-11-26 15:13</footer>';
+
+// Mermaid blocks, if any
+const mm = doc.querySelectorAll("code.language-mermaid");
+if (mm.length) {
+  const { default: mermaid } = await import("https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs");
+  mm.forEach((c) => { const d = document.createElement("div"); d.className = "mermaid"; d.textContent = c.textContent; c.parentElement.replaceWith(d); });
+  mermaid.initialize({ startOnLoad: false, theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default" });
+  await mermaid.run();
+}
+
+// Wrap each h2/h3 with its following content so it can collapse and be filtered
+const slug = (s, used) => { let b = s.toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, "") || "s", k = b, i = 1; while (used.has(k)) k = b + "-" + i++; used.add(k); return k; };
+const used = new Set(), toc = document.getElementById("toc");
+doc.querySelectorAll("h1,h2,h3,h4").forEach((h) => {
+  h.id = h.id || slug(h.textContent, used);
+  const a = document.createElement("a"); a.href = "#" + h.id; a.textContent = h.textContent; a.className = "l" + h.tagName[1];
+  toc.appendChild(a);
+});
+function sectionize(level) {
+  doc.querySelectorAll("h" + level).forEach((h) => {
+    const sec = document.createElement("section"), body = document.createElement("div");
+    sec.dataset.level = level; body.className = "body";
+    h.before(sec); sec.appendChild(h); sec.appendChild(body);
+    let n = sec.nextSibling;
+    while (n && !(n.matches && (n.matches("h1,h2" + (level === 3 ? ",h3" : "") + ",footer") || (n.tagName === "SECTION" && +n.dataset.level <= level)))) {
+      const next = n.nextSibling; body.appendChild(n); n = next;
+    }
+    h.addEventListener("click", () => { body.classList.toggle("hidden"); h.classList.toggle("closed"); });
+  });
+}
+sectionize(3); sectionize(2);
+
+// Filter
+const q = document.getElementById("q");
+q.addEventListener("input", () => {
+  const t = q.value.trim().toLowerCase();
+  doc.querySelectorAll("mark").forEach((m) => m.replaceWith(m.textContent));
+  doc.normalize();
+  doc.querySelectorAll("section").forEach((s) => s.classList.toggle("hidden", !!t && !s.textContent.toLowerCase().includes(t)));
+  if (t) {
+    doc.querySelectorAll("section .body").forEach((b) => { b.classList.remove("hidden"); b.previousSibling.classList.remove("closed"); });
+    const w = document.createTreeWalker(doc, NodeFilter.SHOW_TEXT), hits = [];
+    while (w.nextNode()) if (w.currentNode.nodeValue.toLowerCase().includes(t)) hits.push(w.currentNode);
+    hits.forEach((n) => { const i = n.nodeValue.toLowerCase().indexOf(t); const r = n.splitText(i); r.splitText(t.length); const m = document.createElement("mark"); r.replaceWith(m); m.appendChild(r); });
+  }
+});
+
+// Expand / collapse all
+let open = true;
+document.getElementById("all").onclick = () => {
+  open = !open;
+  doc.querySelectorAll("section .body").forEach((b) => { b.classList.toggle("hidden", !open); b.previousSibling.classList.toggle("closed", !open); });
+};
+
+// Theme
+const root = document.documentElement;
+try { const s = localStorage.getItem("md2html-theme"); if (s) root.dataset.theme = s; } catch {}
+document.getElementById("theme").onclick = () => {
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark";
+  try { localStorage.setItem("md2html-theme", root.dataset.theme); } catch {}
+};
+
+// Image zoom
+doc.addEventListener("click", (e) => { if (e.target.tagName === "IMG") e.target.classList.toggle("zoom"); });
+
+// Highlight current section in TOC
+const links = [...toc.querySelectorAll("a")];
+const io = new IntersectionObserver((es) => es.forEach((e) => {
+  if (e.isIntersecting) links.forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + e.target.id));
+}), { rootMargin: "0px 0px -80% 0px" });
+doc.querySelectorAll("h1,h2,h3,h4").forEach((h) => io.observe(h));
+</script>
+</body>
+</html>

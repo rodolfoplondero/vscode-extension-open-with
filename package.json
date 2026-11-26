@@ -2,7 +2,7 @@
   "name": "abrir-com-externo",
   "displayName": "Open With External Application",
   "description": "Open local files with compatible Windows applications from a searchable VS Code picker.",
-  "version": "0.1.4",
+  "version": "0.1.7",
   "publisher": "local-tools",
   "license": "MIT",
   "engines": {
@@ -12,6 +12,9 @@
     "Other"
   ],
   "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "extensionKind": [
     "ui"
   ],
@@ -24,6 +27,62 @@
     }
   },
   "contributes": {
+    "configuration": {
+      "title": "Open With External Application",
+      "properties": {
+        "openWithExternal.preloadEnabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Preload application lists in the background for configured file types found in local workspace folders. Requires caching to be enabled."
+        },
+        "openWithExternal.preloadExtensions": {
+          "type": "array",
+          "default": [
+            ".docx",
+            ".xlsx",
+            ".pptx",
+            ".pdf",
+            ".odt",
+            ".ods",
+            ".odp",
+            ".rtf",
+            ".md",
+            ".txt",
+            ".csv",
+            ".json",
+            ".xml",
+            ".yaml",
+            ".yml",
+            ".py",
+            ".html",
+            ".css",
+            ".js",
+            ".ts",
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".svg",
+            ".webp",
+            ".drawio",
+            ".bpmn"
+          ],
+          "items": {
+            "type": "string",
+            "pattern": "^\\.?[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "scope": "window",
+          "description": "File extensions to preload when found in local workspace folders. Entries can include or omit the leading dot; capitalization is ignored. An empty list disables preloading."
+        },
+        "openWithExternal.cacheDurationMinutes": {
+          "type": "integer",
+          "default": 5,
+          "minimum": 0,
+          "scope": "window",
+          "description": "Minutes to reuse the discovered applications for each file extension. Set to 0 to disable caching. Changing this setting clears the cache. Use Refresh Applications in the picker to query Windows immediately."
+        }
+      }
+    },
     "commands": [
       {
         "command": "abrirComExterno.open",
@@ -60,7 +119,7 @@
     "compile": "tsc -p .",
     "test": "npm run compile && node --test test/*.test.cjs",
     "vscode:prepublish": "npm run compile",
-    "package": "vsce package --allow-missing-repository --out open-with-external-0.1.4.vsix"
+    "package": "vsce package --allow-missing-repository --out open-with-external-0.1.7.vsix"
   },
   "devDependencies": {
     "@types/node": "22.19.0",
@@ -68,5 +127,8 @@
     "@vscode/vsce": "3.7.1",
     "typescript": "5.9.3"
   },
-  "private": true
+  "private": true,
+  "dependencies": {
+    "minimatch": "10.2.6"
+  }
 }
