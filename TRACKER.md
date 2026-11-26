@@ -10,6 +10,7 @@ Last updated: 2026-11-26
 
 | Code | Name | Status | Progress | Blocker | Opened | Done | Updated |
 |---|---|---|---|---|---|---|---|
+| OWE-005 | Automate validation and GitHub releases | 🔵 Doing | ▓▓▓▓░ 3/4 | — | 2026-11-26 | — | 2026-11-26 |
 | OWE-001 | Review extension usability | ✅ Done | ▓▓▓▓▓ 3/3 | — | 2026-11-26 | 2026-11-26 | 2026-11-26 |
 | OWE-002 | Improve usability and package version 0.1.5 | ✅ Done | ▓▓▓▓▓ 5/5 | — | 2026-11-26 | 2026-11-26 | 2026-11-26 |
 | OWE-003 | Add configurable application discovery cache | ✅ Done | ▓▓▓▓▓ 4/4 | — | 2026-11-26 | 2026-11-26 | 2026-11-26 |
@@ -19,7 +20,21 @@ Last updated: 2026-11-26
 
 ## Doing
 
-_Nothing here._
+### OWE-005 · Automate validation and GitHub releases
+
+- **Status:** Doing
+- **Opened:** 2026-11-26 · **Done:** —
+- **Description:** Run Windows tests and package verification for pull requests and publish the VSIX for matching version tags.
+- **Done when:** The workflow is reviewed, local checks pass, and the PR build succeeds in GitHub Actions.
+- **Deliverables:** [Workflow](.github/workflows/ci-release.yml), [Workflow guide](README.md#github-actions)
+- **Blocker:** —
+
+**Subtasks**
+
+- [x] OWE-005.1 Configure PR validation, versioned artifacts and tag-triggered releases
+- [x] OWE-005.2 Validate YAML, matching and mismatched tags, and isolated package activation
+- [x] OWE-005.3 Pass all 60 tests and complete independent workflow review
+- [ ] OWE-005.4 Publish the workflow on dev and verify its GitHub Actions run
 
 ---
 
@@ -115,3 +130,4 @@ _Nothing here._
 - 2026-11-26 · OWE-004 · Done · All 60 tests passed; version 0.1.7 package and isolated simulated activation verified.
 - 2026-11-26 · OWE-004 · Progress · Revalidated all 60 tests and prepared the dev changes for commit and pull request.
 - 2026-11-26 · OWE-004 · Progress · Opened PR 1 and published release v0.1.7 with a verified VSIX from dev; main unchanged.
+- 2026-11-26 · OWE-005 · Opened · Configured PR builds and tag releases; local validation and workflow review passed.

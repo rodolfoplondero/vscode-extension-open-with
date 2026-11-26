@@ -5,7 +5,7 @@ const path = require('node:path');
 const Module = require('node:module');
 const root = path.resolve(process.argv[2]);
 const manifest = require(path.join(root, 'package.json'));
-assert.equal(manifest.version, '0.1.7');
+assert.equal(manifest.version, require('../package.json').version);
 assert.equal(manifest.publisher + '.' + manifest.name, 'local-tools.abrir-com-externo');
 assert.ok(manifest.activationEvents.includes('onStartupFinished'));
 const settings = manifest.contributes.configuration.properties;
@@ -15,7 +15,7 @@ assert.deepEqual(settings['openWithExternal.preloadExtensions'].default,
   require(path.join(root, 'dist/preload.js')).defaultPreloadExtensions);
 const packageRequire = Module.createRequire(path.join(root, 'dist/workspace.js'));
 assert.ok(packageRequire.resolve('minimatch').startsWith(root + path.sep));
-for (const name of ['test', 'docs', 'TRACKER.md', 'node_modules/typescript']) {
+for (const name of ['.github', 'test', 'docs', 'TRACKER.md', 'node_modules/typescript']) {
   assert.equal(fs.existsSync(path.join(root, name)), false, `Development file shipped: ${name}`);
 }
 const noOpSubscription = () => ({ dispose() {} });
