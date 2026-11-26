@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Approved design: Open With External Application</title>
+<style>
+:root{--bg:#fff;--fg:#1f2328;--muted:#656d76;--line:#d0d7de;--side:#f6f8fa;--accent:#0969da;--code:#f6f8fa;--hit:#fff8c5}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1117;--fg:#e6edf3;--muted:#8d96a0;--line:#30363d;--side:#161b22;--accent:#4493f8;--code:#161b22;--hit:#5a4a00}}
+:root[data-theme="dark"]{--bg:#0d1117;--fg:#e6edf3;--muted:#8d96a0;--line:#30363d;--side:#161b22;--accent:#4493f8;--code:#161b22;--hit:#5a4a00}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 Segoe UI,system-ui,sans-serif}
+header{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;padding:8px 16px;background:var(--side);border-bottom:1px solid var(--line)}
+header .t{font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+header input{padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);width:200px;max-width:40vw}
+header button{padding:4px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);cursor:pointer}
+.wrap{display:flex}
+nav{position:sticky;top:45px;height:calc(100vh - 45px);overflow:auto;width:280px;flex:none;padding:12px;border-right:1px solid var(--line);background:var(--side);font-size:13px}
+nav a{display:block;color:var(--fg);text-decoration:none;padding:2px 4px;border-radius:4px}
+nav a:hover,nav a.on{background:var(--line)}
+nav .l3{padding-left:16px;color:var(--muted)} nav .l4{padding-left:28px;color:var(--muted)}
+main{flex:1;min-width:0;max-width:980px;padding:16px 32px 64px}
+main h1,main h2,main h3,main h4{scroll-margin-top:56px}
+main h2,main h3{cursor:pointer;border-bottom:1px solid var(--line);padding-bottom:4px}
+main h2::before,main h3::before{content:"▾ ";color:var(--muted);font-size:.8em}
+main .closed::before{content:"▸ "}
+table{border-collapse:collapse;display:block;overflow-x:auto;margin:12px 0}
+th,td{border:1px solid var(--line);padding:6px 10px;vertical-align:top}
+th{background:var(--side)}
+code{background:var(--code);padding:1px 4px;border-radius:4px;font-size:.9em}
+pre{background:var(--code);padding:12px;border-radius:6px;overflow:auto}
+pre code{padding:0}
+img{max-width:100%;cursor:zoom-in;border:1px solid var(--line);border-radius:4px}
+img.zoom{position:fixed;inset:0;margin:auto;max-width:96vw;max-height:96vh;z-index:9;cursor:zoom-out;background:var(--bg);box-shadow:0 0 0 100vmax rgba(0,0,0,.6)}
+a{color:var(--accent)}
+blockquote{margin:0;padding:0 12px;border-left:4px solid var(--line);color:var(--muted)}
+mark{background:var(--hit);color:inherit}
+.hidden{display:none!important}
+footer{color:var(--muted);font-size:12px;margin-top:32px}
+@media (max-width:800px){nav{display:none}main{padding:16px}}
+</style>
+</head>
+<body>
+<header>
+  <span class="t">__TITLE__</span>
+  <input id="q" type="search" placeholder="Filter sections…">
+  <button id="all" title="Expand / collapse all">⇕</button>
+  <button id="theme" title="Toggle theme">◐</button>
+</header>
+<div class="wrap"><nav id="toc"></nav><main id="doc"></main></div>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script type="module">
+const md = "# Approved design: Open With External Application\n\nA VS Code extension for local Windows files. Explorer and editor context menus and the Command Palette offer “Open With External Application…”. A searchable Quick Pick lists applications associated with the file type by Windows. Selecting an application opens the file in it; when no supported application is found, the extension offers the native dialog. TypeScript, PowerShell 5.1, and Windows Shell APIs through packaged C#. No additional runtime dependencies, network requests, telemetry, or changes to default associations.\n\nApproaches considered: only the native dialog (simpler, selection outside VS Code) versus an integrated picker based on Windows associations (selected by the user). The implementation uses SHAssocEnumHandlers and IAssocHandler.Invoke instead of interpreting Registry command lines. Applications without registered associations may be absent. Remote WSL/SSH files, folders, and untitled documents are excluded.\n\nDeliverables: source code, VSIX, and instructions. Linux automated tests do not replace native Windows Shell verification; include a manual checklist.\n\nSubsequent user requirements: all extension text and documentation are in English; existing technical identifiers remain stable. Windows recommendations alone do not establish DOCX support. DOCX results additionally require a recognized document-editor executable (Word, LibreOffice/OpenOffice, WPS, ONLYOFFICE, or TextMaker); unknown handlers are omitted and can be selected manually through the explicit native fallback. Other formats retain Windows-recommended handler discovery. This conservative DOCX policy does not guarantee rendering fidelity or enumerate every possible editor.\n";
+const doc = document.getElementById("doc");
+doc.innerHTML = marked.parse(md, { gfm: true }) +
+  '<footer>Generated from 2026-11-12-open-external-design.md · 2026-11-26 16:20</footer>';
+
+// Mermaid blocks, if any
+const mm = doc.querySelectorAll("code.language-mermaid");
+if (mm.length) {
+  const { default: mermaid } = await import("https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs");
+  mm.forEach((c) => { const d = document.createElement("div"); d.className = "mermaid"; d.textContent = c.textContent; c.parentElement.replaceWith(d); });
+  mermaid.initialize({ startOnLoad: false, theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default" });
+  await mermaid.run();
+}
+
+// Wrap each h2/h3 with its following content so it can collapse and be filtered
+const slug = (s, used) => { let b = s.toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, "") || "s", k = b, i = 1; while (used.has(k)) k = b + "-" + i++; used.add(k); return k; };
+const used = new Set(), toc = document.getElementById("toc");
+doc.querySelectorAll("h1,h2,h3,h4").forEach((h) => {
+  h.id = h.id || slug(h.textContent, used);
+  const a = document.createElement("a"); a.href = "#" + h.id; a.textContent = h.textContent; a.className = "l" + h.tagName[1];
+  toc.appendChild(a);
+});
+function sectionize(level) {
+  doc.querySelectorAll("h" + level).forEach((h) => {
+    const sec = document.createElement("section"), body = document.createElement("div");
+    sec.dataset.level = level; body.className = "body";
+    h.before(sec); sec.appendChild(h); sec.appendChild(body);
+    let n = sec.nextSibling;
+    while (n && !(n.matches && (n.matches("h1,h2" + (level === 3 ? ",h3" : "") + ",footer") || (n.tagName === "SECTION" && +n.dataset.level <= level)))) {
+      const next = n.nextSibling; body.appendChild(n); n = next;
+    }
+    h.addEventListener("click", () => { body.classList.toggle("hidden"); h.classList.toggle("closed"); });
+  });
+}
+sectionize(3); sectionize(2);
+
+// Filter
+const q = document.getElementById("q");
+q.addEventListener("input", () => {
+  const t = q.value.trim().toLowerCase();
+  doc.querySelectorAll("mark").forEach((m) => m.replaceWith(m.textContent));
+  doc.normalize();
+  doc.querySelectorAll("section").forEach((s) => s.classList.toggle("hidden", !!t && !s.textContent.toLowerCase().includes(t)));
+  if (t) {
+    doc.querySelectorAll("section .body").forEach((b) => { b.classList.remove("hidden"); b.previousSibling.classList.remove("closed"); });
+    const w = document.createTreeWalker(doc, NodeFilter.SHOW_TEXT), hits = [];
+    while (w.nextNode()) if (w.currentNode.nodeValue.toLowerCase().includes(t)) hits.push(w.currentNode);
+    hits.forEach((n) => { const i = n.nodeValue.toLowerCase().indexOf(t); const r = n.splitText(i); r.splitText(t.length); const m = document.createElement("mark"); r.replaceWith(m); m.appendChild(r); });
+  }
+});
+
+// Expand / collapse all
+let open = true;
+document.getElementById("all").onclick = () => {
+  open = !open;
+  doc.querySelectorAll("section .body").forEach((b) => { b.classList.toggle("hidden", !open); b.previousSibling.classList.toggle("closed", !open); });
+};
+
+// Theme
+const root = document.documentElement;
+try { const s = localStorage.getItem("md2html-theme"); if (s) root.dataset.theme = s; } catch {}
+document.getElementById("theme").onclick = () => {
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark";
+  try { localStorage.setItem("md2html-theme", root.dataset.theme); } catch {}
+};
+
+// Image zoom
+doc.addEventListener("click", (e) => { if (e.target.tagName === "IMG") e.target.classList.toggle("zoom"); });
+
+// Highlight current section in TOC
+const links = [...toc.querySelectorAll("a")];
+const io = new IntersectionObserver((es) => es.forEach((e) => {
+  if (e.isIntersecting) links.forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + e.target.id));
+}), { rootMargin: "0px 0px -80% 0px" });
+doc.querySelectorAll("h1,h2,h3,h4").forEach((h) => io.observe(h));
+</script>
+</body>
+</html>

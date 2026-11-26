@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Application preloading from workspace file types</title>
+<style>
+:root{--bg:#fff;--fg:#1f2328;--muted:#656d76;--line:#d0d7de;--side:#f6f8fa;--accent:#0969da;--code:#f6f8fa;--hit:#fff8c5}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1117;--fg:#e6edf3;--muted:#8d96a0;--line:#30363d;--side:#161b22;--accent:#4493f8;--code:#161b22;--hit:#5a4a00}}
+:root[data-theme="dark"]{--bg:#0d1117;--fg:#e6edf3;--muted:#8d96a0;--line:#30363d;--side:#161b22;--accent:#4493f8;--code:#161b22;--hit:#5a4a00}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 Segoe UI,system-ui,sans-serif}
+header{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;padding:8px 16px;background:var(--side);border-bottom:1px solid var(--line)}
+header .t{font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+header input{padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);width:200px;max-width:40vw}
+header button{padding:4px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);cursor:pointer}
+.wrap{display:flex}
+nav{position:sticky;top:45px;height:calc(100vh - 45px);overflow:auto;width:280px;flex:none;padding:12px;border-right:1px solid var(--line);background:var(--side);font-size:13px}
+nav a{display:block;color:var(--fg);text-decoration:none;padding:2px 4px;border-radius:4px}
+nav a:hover,nav a.on{background:var(--line)}
+nav .l3{padding-left:16px;color:var(--muted)} nav .l4{padding-left:28px;color:var(--muted)}
+main{flex:1;min-width:0;max-width:980px;padding:16px 32px 64px}
+main h1,main h2,main h3,main h4{scroll-margin-top:56px}
+main h2,main h3{cursor:pointer;border-bottom:1px solid var(--line);padding-bottom:4px}
+main h2::before,main h3::before{content:"▾ ";color:var(--muted);font-size:.8em}
+main .closed::before{content:"▸ "}
+table{border-collapse:collapse;display:block;overflow-x:auto;margin:12px 0}
+th,td{border:1px solid var(--line);padding:6px 10px;vertical-align:top}
+th{background:var(--side)}
+code{background:var(--code);padding:1px 4px;border-radius:4px;font-size:.9em}
+pre{background:var(--code);padding:12px;border-radius:6px;overflow:auto}
+pre code{padding:0}
+img{max-width:100%;cursor:zoom-in;border:1px solid var(--line);border-radius:4px}
+img.zoom{position:fixed;inset:0;margin:auto;max-width:96vw;max-height:96vh;z-index:9;cursor:zoom-out;background:var(--bg);box-shadow:0 0 0 100vmax rgba(0,0,0,.6)}
+a{color:var(--accent)}
+blockquote{margin:0;padding:0 12px;border-left:4px solid var(--line);color:var(--muted)}
+mark{background:var(--hit);color:inherit}
+.hidden{display:none!important}
+footer{color:var(--muted);font-size:12px;margin-top:32px}
+@media (max-width:800px){nav{display:none}main{padding:16px}}
+</style>
+</head>
+<body>
+<header>
+  <span class="t">__TITLE__</span>
+  <input id="q" type="search" placeholder="Filter sections…">
+  <button id="all" title="Expand / collapse all">⇕</button>
+  <button id="theme" title="Toggle theme">◐</button>
+</header>
+<div class="wrap"><nav id="toc"></nav><main id="doc"></main></div>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script type="module">
+const md = "# Application preloading from workspace file types\n\nDate: 2026-11-26\nStatus: Approved by the user in chat; implemented in version 0.1.7\nBranch: dev\n\n## Intent\n\nReduce the wait for the first Open With request by discovering applications for common file types already present in local workspace folders. Reuse the existing session cache and its configured lifetime.\n\n## Decisions from the conversation\n\n- Scan the workspace and preload only configured file types actually found there.\n- Include all proposed groups in the default extension list.\n- Let the user edit the extension list and enable or disable preloading in VS Code Settings.\n- Continue on dev; integration will be through a later PR. No commit is required for this design review.\n\n## Approaches\n\n1. Bounded workspace scan, followed by discovery for matching types. Selected by the user; avoids querying formats absent from the workspace, at the cost of a filename scan.\n2. Preload every configured format without a scan. Simpler, but queries unused formats; not selected.\n\n## Proposed settings\n\n- `openWithExternal.preloadEnabled`: boolean, default `true` (proposed default).\n- `openWithExternal.preloadExtensions`: editable list, default:\n  `.docx`, `.xlsx`, `.pptx`, `.pdf`, `.odt`, `.ods`, `.odp`, `.rtf`,\n  `.md`, `.txt`, `.csv`, `.json`, `.xml`, `.yaml`, `.yml`,\n  `.py`, `.html`, `.css`, `.js`, `.ts`,\n  `.png`, `.jpg`, `.jpeg`, `.svg`, `.webp`, `.drawio`, `.bpmn`.\n- Keep `openWithExternal.cacheDurationMinutes` unchanged: default 5 minutes; 0 disables both caching and preloading.\n- Normalize extensions without regard to capitalization; accept entries with or without the leading dot and deduplicate them. An empty list means no preloading.\n\n## Proposed behavior and limits\n\n- Activate after VS Code startup finishes. Run in the background on Windows for local workspace folders only, and repeat when workspace folders are added or relevant settings change.\n- Inspect filenames only, never document contents, and never open or execute a discovered file.\n- Examine at most 5,000 matching file paths across the workspace per pass (proposed limit). Types not found within this bounded result remain available through normal on-demand discovery.\n- Respect applicable workspace exclusion settings and always skip common generated/dependency folders: `.git`, `node_modules`, `.venv`, `venv`, `dist`, and `build`.\n- Select one accessible file per distinct configured extension and use it for application discovery. Multiple workspace roots share the same per-extension cache.\n- Query one type at a time. Explicit Open With requests take priority; avoid concurrent duplicate discovery of the same type.\n- Cancel obsolete work when disabled, workspace folders change, settings change, or the extension is disposed. No scan when no local folder is open.\n- Background failures remain quiet and leave normal on-demand discovery available. Keep existing DOCX filtering and file validation.\n- Cache only successful nonempty results. Keep the current fixed expiry from discovery completion; no periodic refresh or attempt to keep the cache permanently warm. The first use after expiry may query Windows again.\n- Refresh Applications continues to force discovery. Preloading does not select an application, launch a file, change Windows defaults, or persist cache data.\n\n## Validation and delivery\n\nTest settings defaults, extension normalization, exclusions and bounds, distinct-type discovery, startup/folder-change triggers, cancellation, disabled/zero-cache behavior, errors, and command priority. Retain the existing regression suite. Build and inspect a new versioned VSIX for manual installation. Live startup impact and native Windows behavior require a manual smoke test; no speed claim is made before measurement.\n\nThis is a small extension of the current cache. Implementation details, including the exact scan API and coordination mechanism, remain with the implementer. Product code will follow approval of this short design.\n\n## Delivery evidence\n\nImplemented on dev with changes left uncommitted. TypeScript compilation and 60 automated tests passed. Version 0.1.7 VSIX includes the current modules and production dependencies; activation succeeded from an isolated extracted package with a mocked VS Code API. Actual Windows startup impact and native windows remain manual checks.\n";
+const doc = document.getElementById("doc");
+doc.innerHTML = marked.parse(md, { gfm: true }) +
+  '<footer>Generated from 2026-11-26-application-preload-design.md · 2026-11-26 16:20</footer>';
+
+// Mermaid blocks, if any
+const mm = doc.querySelectorAll("code.language-mermaid");
+if (mm.length) {
+  const { default: mermaid } = await import("https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs");
+  mm.forEach((c) => { const d = document.createElement("div"); d.className = "mermaid"; d.textContent = c.textContent; c.parentElement.replaceWith(d); });
+  mermaid.initialize({ startOnLoad: false, theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default" });
+  await mermaid.run();
+}
+
+// Wrap each h2/h3 with its following content so it can collapse and be filtered
+const slug = (s, used) => { let b = s.toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, "") || "s", k = b, i = 1; while (used.has(k)) k = b + "-" + i++; used.add(k); return k; };
+const used = new Set(), toc = document.getElementById("toc");
+doc.querySelectorAll("h1,h2,h3,h4").forEach((h) => {
+  h.id = h.id || slug(h.textContent, used);
+  const a = document.createElement("a"); a.href = "#" + h.id; a.textContent = h.textContent; a.className = "l" + h.tagName[1];
+  toc.appendChild(a);
+});
+function sectionize(level) {
+  doc.querySelectorAll("h" + level).forEach((h) => {
+    const sec = document.createElement("section"), body = document.createElement("div");
+    sec.dataset.level = level; body.className = "body";
+    h.before(sec); sec.appendChild(h); sec.appendChild(body);
+    let n = sec.nextSibling;
+    while (n && !(n.matches && (n.matches("h1,h2" + (level === 3 ? ",h3" : "") + ",footer") || (n.tagName === "SECTION" && +n.dataset.level <= level)))) {
+      const next = n.nextSibling; body.appendChild(n); n = next;
+    }
+    h.addEventListener("click", () => { body.classList.toggle("hidden"); h.classList.toggle("closed"); });
+  });
+}
+sectionize(3); sectionize(2);
+
+// Filter
+const q = document.getElementById("q");
+q.addEventListener("input", () => {
+  const t = q.value.trim().toLowerCase();
+  doc.querySelectorAll("mark").forEach((m) => m.replaceWith(m.textContent));
+  doc.normalize();
+  doc.querySelectorAll("section").forEach((s) => s.classList.toggle("hidden", !!t && !s.textContent.toLowerCase().includes(t)));
+  if (t) {
+    doc.querySelectorAll("section .body").forEach((b) => { b.classList.remove("hidden"); b.previousSibling.classList.remove("closed"); });
+    const w = document.createTreeWalker(doc, NodeFilter.SHOW_TEXT), hits = [];
+    while (w.nextNode()) if (w.currentNode.nodeValue.toLowerCase().includes(t)) hits.push(w.currentNode);
+    hits.forEach((n) => { const i = n.nodeValue.toLowerCase().indexOf(t); const r = n.splitText(i); r.splitText(t.length); const m = document.createElement("mark"); r.replaceWith(m); m.appendChild(r); });
+  }
+});
+
+// Expand / collapse all
+let open = true;
+document.getElementById("all").onclick = () => {
+  open = !open;
+  doc.querySelectorAll("section .body").forEach((b) => { b.classList.toggle("hidden", !open); b.previousSibling.classList.toggle("closed", !open); });
+};
+
+// Theme
+const root = document.documentElement;
+try { const s = localStorage.getItem("md2html-theme"); if (s) root.dataset.theme = s; } catch {}
+document.getElementById("theme").onclick = () => {
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark";
+  try { localStorage.setItem("md2html-theme", root.dataset.theme); } catch {}
+};
+
+// Image zoom
+doc.addEventListener("click", (e) => { if (e.target.tagName === "IMG") e.target.classList.toggle("zoom"); });
+
+// Highlight current section in TOC
+const links = [...toc.querySelectorAll("a")];
+const io = new IntersectionObserver((es) => es.forEach((e) => {
+  if (e.isIntersecting) links.forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + e.target.id));
+}), { rootMargin: "0px 0px -80% 0px" });
+doc.querySelectorAll("h1,h2,h3,h4").forEach((h) => io.observe(h));
+</script>
+</body>
+</html>

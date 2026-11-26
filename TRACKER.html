@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open With External Application Board</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#1c2230;--muted:#5d6678;--line:#e2e5eb;--accent:#2f6fde;--ok:#1f8a4c;--warn:#b26b00;--bad:#c2372f;--chip:#eef1f6;--drop:#e5edfc}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12151b;--panel:#1b1f27;--ink:#e6e9ef;--muted:#9aa3b2;--line:#2c323d;--accent:#6f9cf0;--ok:#4cc27e;--warn:#e0a03a;--bad:#ef6b62;--chip:#252b35;--drop:#1f2a3d}}
+:root[data-theme="dark"]{--bg:#12151b;--panel:#1b1f27;--ink:#e6e9ef;--muted:#9aa3b2;--line:#2c323d;--accent:#6f9cf0;--ok:#4cc27e;--warn:#e0a03a;--bad:#ef6b62;--chip:#252b35;--drop:#1f2a3d}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1400px;margin:0 auto;padding:24px 16px}
+.top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:flex-start}
+h1{font-size:22px;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 16px}
+.bar-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button:disabled{opacity:.5;cursor:default}
+.mode{font-size:12px;padding:3px 10px;border-radius:99px;background:var(--chip);color:var(--muted)}
+.mode.live{color:var(--ok)}
+.notice{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:0 0 16px;color:var(--muted)}
+.stats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 14px;min-width:96px}
+.stat b{display:block;font-size:20px}
+.stat span{color:var(--muted);font-size:12px}
+.stat.blocked b{color:var(--bad)}.stat.done b{color:var(--ok)}.stat.doing b{color:var(--accent)}
+.board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:start}
+.col{border-radius:12px;padding:6px;min-height:120px;transition:background .15s}
+.col.over{background:var(--drop);outline:2px dashed var(--accent)}
+.col h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:4px 4px 10px;display:flex;justify-content:space-between}
+.empty{color:var(--muted);font-style:italic;padding:12px;border:1px dashed var(--line);border-radius:10px;margin:0}
+.card{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:12px 14px;margin-bottom:12px}
+.card[draggable="true"]{cursor:grab}
+.card.dragging{opacity:.4}
+.card.k-backlog{border-left-color:var(--muted)}.card.k-done{border-left-color:var(--ok)}.card.k-blocked{border-left-color:var(--bad)}
+.card header{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.code{font:600 12px ui-monospace,Consolas,monospace;color:var(--muted)}
+.tools{display:flex;gap:4px;align-items:center}
+.tools select,.tools button{padding:2px 6px;font-size:12px;border-radius:6px}
+.card h3{font-size:15px;margin:6px 0 4px}
+.desc{margin:0 0 8px}
+.blocker{margin:0 0 8px;padding:6px 8px;border-radius:6px;background:color-mix(in srgb,var(--bad) 12%,transparent)}
+.pbar{height:6px;background:var(--chip);border-radius:99px;overflow:hidden;margin:6px 0 4px}
+.pbar span{display:block;height:100%;background:var(--accent)}
+.k-done .pbar span{background:var(--ok)}
+.meta{margin:0 0 4px;color:var(--muted);font-size:12px}
+.deliv{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
+.deliv a{font-size:12px;background:var(--chip);padding:2px 8px;border-radius:6px;text-decoration:none;color:var(--accent);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+details{margin-top:6px}
+summary{cursor:pointer;color:var(--accent);font-size:12px}
+h4{font-size:12px;margin:10px 0 4px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.items{list-style:none;margin:0;padding:0}
+.items li{display:flex;gap:6px;padding:2px 0;align-items:flex-start}
+.items li.ok span{color:var(--muted);text-decoration:line-through}
+.items input{margin-top:3px;accent-color:var(--ok)}
+.items em{color:var(--warn);font-style:normal;font-size:12px}
+.items em.blocked{color:var(--bad)}
+code{font:12px ui-monospace,Consolas,monospace;background:var(--chip);padding:0 4px;border-radius:4px}
+a{color:var(--accent)}
+.log{margin-top:28px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.log h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 8px}
+.log ol{list-style:none;margin:0;padding:0}
+.log li{display:grid;grid-template-columns:88px 110px 80px 1fr;gap:8px;padding:5px 0;border-top:1px solid var(--line)}
+.log li:first-child{border-top:0}
+.log .k-Done{color:var(--ok)}.log .k-Blocked{color:var(--bad)}.log .k-Progress{color:var(--accent)}.log .k-Opened{color:var(--muted)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:calc(100% - 32px)}
+.toast.show{opacity:1}
+@media (max-width:1000px){.board{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.board{grid-template-columns:1fr}.log li{grid-template-columns:1fr;gap:0}}
+.tabs{display:flex;gap:4px;margin:0 0 16px;border-bottom:1px solid var(--line)}
+.tab{border:0;border-bottom:2px solid transparent;border-radius:8px 8px 0 0;background:none;color:var(--muted);padding:8px 16px;font-weight:600}
+.tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.view[hidden]{display:none}
+.tools-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.tools-row input[type=search]{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 12px;min-width:220px;flex:1;max-width:360px}
+.tbl-wrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+table.tbl{width:100%;border-collapse:collapse}
+.tbl th,.tbl td{text-align:left;padding:8px 10px;border-top:1px solid var(--line);vertical-align:top}
+.tbl thead th{border-top:0;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;cursor:pointer;user-select:none}
+.tbl thead th[aria-sort="ascending"]::after{content:" \25B2"}.tbl thead th[aria-sort="descending"]::after{content:" \25BC"}
+.tbl tr.row{cursor:pointer}.tbl tr.row:hover{background:var(--chip)}
+.tbl tr.sub td{background:var(--bg);padding:6px 10px 10px 36px}
+.tbl .num{white-space:nowrap}
+.tbl .pbar{width:90px;display:inline-block;vertical-align:middle;margin:0 6px 0 0}
+.tbl tr.k-done .pbar span{background:var(--ok)}
+.cal-nav{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.cal-nav h2{font-size:16px;margin:0 8px;min-width:150px}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+.cal .dow{padding:6px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);background:var(--chip)}
+.cal .day{min-height:96px;padding:4px;border-top:1px solid var(--line);border-left:1px solid var(--line);min-width:0}
+.cal .day:nth-child(7n+1){border-left:0}
+.cal .day.out{background:var(--bg);opacity:.6}
+.cal .day.today .dn{background:var(--accent);color:#fff}
+.dn{display:inline-block;font-size:12px;color:var(--muted);padding:0 6px;border-radius:99px;margin-bottom:2px}
+.ev{display:flex;gap:4px;align-items:center;width:100%;text-align:left;font-size:11px;padding:1px 4px;margin:1px 0;border-radius:6px;border:1px solid var(--line);background:var(--panel);overflow:hidden;white-space:nowrap}
+.ev.sel{outline:2px solid var(--accent)}
+.chip{font-size:10px;font-weight:600;padding:0 5px;border-radius:99px;color:#fff;background:var(--muted);flex:none}
+.chip.Progress{background:var(--accent)}.chip.Blocked{background:var(--bad)}.chip.Done{background:var(--ok)}.chip.Opened{background:var(--muted)}.chip.Marker{background:var(--warn)}
+.ev .c{font:600 11px ui-monospace,Consolas,monospace;overflow:hidden;text-overflow:ellipsis}
+.cal-note{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.agenda{display:none}
+.agenda .adate{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:12px 0 4px}
+@media (max-width:600px){.cal{display:none}.agenda{display:block}.tabs .tab{padding:8px 10px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1 id="title"></h1>
+      <p class="sub" id="sub"></p>
+    </div>
+    <div class="bar-actions">
+      <span class="mode" id="mode">Snapshot</span>
+      <button id="connect" class="primary">Connect folder to edit</button>
+      <button id="reload" hidden>Reload from disk</button>
+    </div>
+  </div>
+  <p class="notice" id="notice"></p>
+  <div class="tabs" role="tablist" id="tabs">
+    <button class="tab" role="tab" data-view="table" aria-selected="false">Table</button>
+    <button class="tab" role="tab" data-view="calendar" aria-selected="false">Calendar</button>
+    <button class="tab" role="tab" data-view="kanban" aria-selected="true">Kanban</button>
+  </div>
+  <div class="view" id="v-kanban">
+    <div class="stats" id="stats"></div>
+    <main class="board" id="board"></main>
+    <section class="log" id="log"></section>
+  </div>
+  <div class="view" id="v-table" hidden>
+    <div class="tools-row"><input type="search" id="tfilter" placeholder="Filter tasks" aria-label="Filter tasks"></div>
+    <div class="tbl-wrap"><table class="tbl" id="tbl"></table></div>
+  </div>
+  <div class="view" id="v-calendar" hidden>
+    <div class="cal-nav">
+      <button id="cprev" aria-label="Previous month">&lt;</button>
+      <button id="cnext" aria-label="Next month">&gt;</button>
+      <button id="ctoday">Today</button>
+      <h2 id="ctitle"></h2>
+    </div>
+    <div class="cal" id="cal"></div>
+    <div class="agenda" id="agenda"></div>
+    <div class="cal-note" id="cnote" hidden></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script>
+// Parses and rewrites TRACKER.md files (format: Activity tracker rules in ~/.claude/tracker.md).
+// Shared by board.js (Node) and the board page (browser). Pure string functions, no I/O.
+(function (root, factory) {
+  const lib = factory();
+  if (typeof module === 'object' && module.exports) module.exports = lib;
+  else root.TrackerLib = lib;
+})(typeof self !== 'undefined' ? self : this, function () {
+  const BOARD = ['Doing', 'Backlog', 'Done'];
+  const ICON = { Doing: '🔵', Blocked: '🔴', Backlog: '⚪', Done: '✅' };
+  const STATUS_TEXT = { Doing: 'Doing', Blocked: 'Doing · Blocked', Backlog: 'Backlog', Done: 'Done' };
+
+  function today() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  const cells = line => line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(s => s.trim());
+
+  function parse(text) {
+    const eol = text.includes('\r\n') ? '\r\n' : '\n';
+    const lines = text.replace(/\r\n/g, '\n').split('\n');
+    const doc = { eol, preamble: [], sections: [], tasks: [], summary: {}, log: [], pendingLog: [] };
+    let cur = null;
+    for (const line of lines) {
+      const h2 = line.match(/^## (.+?)\s*$/);
+      if (h2) {
+        stripRule(cur ? cur.lines : doc.preamble); // the `---` before a heading is rewritten on save
+        cur = { name: h2[1], lines: [] }; doc.sections.push(cur); continue;
+      }
+      (cur ? cur.lines : doc.preamble).push(line);
+    }
+    for (const s of doc.sections) {
+      if (s.name === 'Summary') parseSummary(s.lines, doc.summary);
+      else if (BOARD.includes(s.name)) parseTasks(s.lines, s.name, doc.tasks);
+      else if (s.name === 'Activity log') {
+        for (const l of s.lines) {
+          const m = l.match(/^- (\d{4}-\d{2}-\d{2}) · (\S+) · ([^·]+?) · (.+)$/);
+          if (m) doc.log.push({ date: m[1], code: m[2], kind: m[3].trim(), note: m[4].trim() });
+        }
+      }
+    }
+    const t = doc.preamble.find(l => l.startsWith('# '));
+    doc.title = t ? t.slice(2).replace(/\s*[–-]\s*Activity Tracker\s*$/i, '').trim() : 'Tracker';
+    const u = doc.preamble.join('\n').match(/^Last updated:\s*(.+)$/m);
+    doc.updated = u ? u[1].trim() : '';
+    return doc;
+  }
+
+  function parseSummary(lines, out) {
+    const rows = lines.filter(l => l.trim().startsWith('|'));
+    if (rows.length < 2) return;
+    const head = cells(rows[0]).map(h => h.toLowerCase());
+    const iCode = head.indexOf('code'), iBlk = head.indexOf('blocker'), iUpd = head.indexOf('updated');
+    for (const r of rows.slice(2)) {
+      const c = cells(r);
+      if (iCode < 0 || !c[iCode]) continue;
+      out[c[iCode]] = { blocker: iBlk >= 0 ? c[iBlk] : null, updated: iUpd >= 0 ? c[iUpd] : '' };
+    }
+  }
+
+  function parseTasks(lines, section, out) {
+    let t = null;
+    for (const line of lines) {
+      const h3 = line.match(/^### (\S+) · (.+?)\s*$/);
+      if (h3) { t = { code: h3[1], name: h3[2], section, lines: [] }; out.push(t); continue; }
+      if (t) t.lines.push(line);
+    }
+    for (const task of out) trimBlank(task.lines);
+  }
+
+  function stripRule(arr) {
+    while (arr.length && (!arr[arr.length - 1].trim() || /^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(arr[arr.length - 1]))) arr.pop();
+  }
+
+  function trimBlank(arr) {
+    while (arr.length && !arr[0].trim()) arr.shift();
+    while (arr.length && !arr[arr.length - 1].trim()) arr.pop();
+    return arr;
+  }
+
+  // Derived view of a task body. Item `line` indexes point into task.lines.
+  function info(t) {
+    const r = { status: t.section, opened: '', done: '', description: '', doneWhen: '', blocker: '—', deliverables: [], subtasks: [], checklist: [] };
+    let block = null;
+    t.lines.forEach((line, i) => {
+      let m;
+      if (/^\*\*Subtasks\*\*/.test(line)) block = 'subtasks';
+      else if (/^\*\*Checklist\*\*/.test(line)) block = 'checklist';
+      else if ((m = line.match(/^- \*\*Status:\*\*\s*(.+)$/))) r.status = m[1].trim();
+      else if ((m = line.match(/^- \*\*Opened:\*\*\s*(.+?)\s*·\s*\*\*Done:\*\*\s*(.+)$/))) { r.opened = m[1].trim(); r.done = m[2].trim(); }
+      else if ((m = line.match(/^- \*\*Description:\*\*\s*(.*)$/))) r.description = m[1].trim();
+      else if ((m = line.match(/^- \*\*Done when:\*\*\s*(.*)$/))) r.doneWhen = m[1].trim();
+      else if ((m = line.match(/^- \*\*Deliverables:\*\*\s*(.*)$/))) r.deliverables = [...m[1].matchAll(/\[([^\]]+)\]\(([^)]+)\)/g)].map(x => ({ label: x[1], href: x[2] }));
+      else if ((m = line.match(/^- \*\*Blocker:\*\*\s*(.*)$/))) r.blocker = m[1].trim();
+      else if (block && (m = line.match(/^- \[( |x|X)\] (.+)$/))) {
+        let text = m[2].trim(), flag = '';
+        const f = text.match(/\s*\((In progress|Blocked)\)\s*$/);
+        if (f) { flag = f[1]; text = text.slice(0, f.index).trim(); }
+        const c = text.match(/^(\S+-\d+\.\d+)\s+(.*)$/);
+        r[block].push({ line: i, block, done: m[1] !== ' ', text, code: c ? c[1] : '', name: c ? c[2] : text, flag });
+      }
+    });
+    return r;
+  }
+
+  const kind = t => t.section === 'Done' ? 'Done' : t.section === 'Backlog' ? 'Backlog' : /blocked/i.test(info(t).status) ? 'Blocked' : 'Doing';
+
+  function progress(list) {
+    const total = list.length, done = list.filter(i => i.done).length;
+    return { total, done, pct: total ? Math.round((done / total) * 100) : 0 };
+  }
+
+  function progressBar(list) {
+    const p = progress(list);
+    if (!p.total) return '—';
+    const n = Math.round((p.done / p.total) * 5);
+    return `${'▓'.repeat(n)}${'░'.repeat(5 - n)} ${p.done}/${p.total}`;
+  }
+
+  function shorten(s) {
+    const clean = String(s || '').replace(/[.;\s]+$/, '').trim();
+    if (!clean || clean === '—') return '—';
+    const words = clean.split(/\s+/);
+    return words.length <= 8 ? clean : words.slice(0, 8).join(' ') + '…';
+  }
+
+  const byCode = (a, b) => a.code.localeCompare(b.code, undefined, { numeric: true });
+
+  function lastActivity(doc, t) {
+    const hits = doc.log.filter(e => e.code === t.code || e.code.startsWith(t.code + '.'));
+    return hits.length ? hits[hits.length - 1] : null;
+  }
+
+  // Last update date: Summary "Updated" cell, else latest log line, else opened date.
+  function updatedOf(doc, t) {
+    const s = doc.summary[t.code];
+    if (s && /^\d{4}-\d{2}-\d{2}$/.test(s.updated || '')) return s.updated;
+    const last = lastActivity(doc, t);
+    return last ? last.date : info(t).opened;
+  }
+
+  // Doing → Backlog → Done; inside each, last update newest first, ties by code.
+  function ordered(doc) {
+    const sort = list => list.sort((a, b) => updatedOf(doc, b).localeCompare(updatedOf(doc, a)) || byCode(a, b));
+    const doing = sort(doc.tasks.filter(t => t.section === 'Doing'));
+    const backlog = sort(doc.tasks.filter(t => t.section === 'Backlog'));
+    const done = sort(doc.tasks.filter(t => t.section === 'Done'));
+    return { Doing: doing, Backlog: backlog, Done: done, all: [...doing, ...backlog, ...done] };
+  }
+
+  // ---- edits on task lines ----
+  function setField(t, key, value) {
+    const re = new RegExp(`^- \\*\\*${key}:\\*\\*`);
+    const i = t.lines.findIndex(l => re.test(l));
+    const line = `- **${key}:** ${value}`;
+    if (i >= 0) { t.lines[i] = line; return; }
+    let last = -1;
+    t.lines.forEach((l, j) => { if (/^- \*\*[^*]+:\*\*/.test(l)) last = j; });
+    t.lines.splice(last + 1, 0, line);
+  }
+
+  function setDates(t, opened, done) {
+    const i = t.lines.findIndex(l => /^- \*\*Opened:\*\*/.test(l));
+    const line = `- **Opened:** ${opened} · **Done:** ${done}`;
+    if (i >= 0) t.lines[i] = line; else setField(t, 'Opened', `${opened} · **Done:** ${done}`);
+  }
+
+  function setItem(t, item, done) {
+    t.lines[item.line] = `- [${done ? 'x' : ' '}] ${item.text}${!done && item.flag ? ` (${item.flag})` : ''}`;
+  }
+
+  function touch(doc, t, date) {
+    doc.summary[t.code] = Object.assign({ blocker: null }, doc.summary[t.code], { updated: date });
+  }
+
+  function find(doc, code) {
+    const t = doc.tasks.find(x => x.code === code);
+    if (!t) throw new Error(`Task ${code} not found`);
+    return t;
+  }
+
+  // ---- operations: mutate doc, queue log lines ----
+  function rename(doc, code, name, date = today()) {
+    const t = find(doc, code);
+    name = name.replace(/\s+/g, ' ').trim();
+    if (!name || name === t.name) return false;
+    const old = t.name;
+    t.name = name;
+    touch(doc, t, date);
+    doc.pendingLog.push({ date, code, kind: 'Progress', note: `Renamed from "${old}" to "${name}"` });
+    return true;
+  }
+
+  // target: 'Backlog' | 'Doing' | 'Blocked' | 'Done'. opts: { reason, closeSubtasks }
+  function move(doc, code, target, opts = {}, date = today()) {
+    const t = find(doc, code);
+    const from = kind(t);
+    if (from === target) return false;
+    const i = info(t);
+    let note;
+    if (target === 'Done') {
+      const open = i.subtasks.filter(s => !s.done);
+      if (open.length && !opts.closeSubtasks) {
+        const e = new Error(`${open.length} subtask(s) still open`);
+        e.code = 'OPEN_SUBTASKS'; e.open = open;
+        throw e;
+      }
+      open.forEach(s => setItem(t, s, true));
+      t.section = 'Done';
+      setField(t, 'Status', 'Done');
+      setDates(t, i.opened, date);
+      setField(t, 'Blocker', '—');
+      doc.summary[code] = Object.assign({}, doc.summary[code], { blocker: '—' });
+      note = open.length ? `Closed from the board; ${open.length} open subtask(s) marked done` : 'Closed from the board';
+      doc.pendingLog.push({ date, code, kind: 'Done', note });
+    } else {
+      if (from === 'Done') setDates(t, i.opened, '—');
+      if (target === 'Blocked') {
+        const reason = String(opts.reason || '').trim();
+        if (!reason) throw new Error('A blocker reason is required');
+        t.section = 'Doing';
+        setField(t, 'Status', 'Doing · Blocked');
+        setField(t, 'Blocker', reason);
+        doc.summary[code] = Object.assign({}, doc.summary[code], { blocker: shorten(reason) });
+        doc.pendingLog.push({ date, code, kind: 'Blocked', note: reason });
+      } else {
+        t.section = target;
+        setField(t, 'Status', target);
+        if (from === 'Blocked') {
+          setField(t, 'Blocker', '—');
+          doc.summary[code] = Object.assign({}, doc.summary[code], { blocker: '—' });
+        }
+        note = from === 'Done' ? `Reopened (moved to ${target})`
+          : from === 'Blocked' ? (target === 'Doing' ? 'Unblocked' : `Unblocked and moved to ${target}`)
+          : from === 'Backlog' && target === 'Doing' ? 'Started'
+          : `Moved to ${target}`;
+        doc.pendingLog.push({ date, code, kind: 'Progress', note });
+      }
+    }
+    touch(doc, t, date);
+    return true;
+  }
+
+  // block: 'subtasks' | 'checklist'; index within that list.
+  function toggleItem(doc, code, block, index, done, date = today()) {
+    const t = find(doc, code);
+    const item = info(t)[block][index];
+    if (!item || item.done === done) return false;
+    setItem(t, item, done);
+    touch(doc, t, date);
+    if (block === 'subtasks') {
+      doc.pendingLog.push({ date, code: item.code || code, kind: done ? 'Done' : 'Progress', note: done ? item.name : `Reopened: ${item.name}` });
+    } else {
+      doc.pendingLog.push({ date, code, kind: 'Progress', note: done ? `Criterion met: ${item.text}` : `Criterion reopened: ${item.text}` });
+    }
+    return true;
+  }
+
+  // ---- derived parts follow the task bodies (used by tracker-render.js) ----
+  // Task body Status picks the board section; Updated is the newest of the Summary cell and the
+  // activity log. Blocker: "—" when the body has none, else the short Summary text if there is one.
+  function normalize(doc) {
+    for (const t of doc.tasks) {
+      const i = info(t);
+      const sec = /^done/i.test(i.status) ? 'Done' : /^backlog/i.test(i.status) ? 'Backlog' : /^doing/i.test(i.status) ? 'Doing' : null;
+      if (sec) t.section = sec;
+      const s = doc.summary[t.code] || {}, last = lastActivity(doc, t);
+      const dates = [s.updated, last && last.date].filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d || '')).sort();
+      const short = s.blocker && s.blocker !== '—' ? s.blocker : null;
+      doc.summary[t.code] = { blocker: shorten(i.blocker) === '—' ? '—' : short, updated: dates.length ? dates[dates.length - 1] : '' };
+    }
+    // A stale copy of the Summary table above "## Summary" is dropped; the real one is rebuilt.
+    if (doc.sections.some(s => s.name === 'Summary')) doc.preamble = doc.preamble.filter(l => !/^\s*\|/.test(l));
+    return doc;
+  }
+
+  // Format problems normalize() cannot repair (fix-tracker.js can): no Summary, tasks without dates.
+  function drift(doc) {
+    const bad = [];
+    if (!doc.sections.some(s => s.name === 'Summary')) bad.push('no "## Summary" heading');
+    const undated = doc.tasks.filter(t => !info(t).opened).map(t => t.code);
+    if (undated.length) bad.push(`no "- **Opened:**" line in ${undated.join(', ')}`);
+    return bad;
+  }
+
+  // ---- write back ----
+  function summaryRow(doc, t) {
+    const i = info(t), k = kind(t), s = doc.summary[t.code] || {};
+    const blocker = s.blocker != null && s.blocker !== '' ? s.blocker : shorten(i.blocker);
+    const updated = updatedOf(doc, t);
+    return `| ${t.code} | ${t.name} | ${ICON[k]} ${STATUS_TEXT[k]} | ${progressBar(i.subtasks)} | ${blocker} | ${i.opened} | ${i.done || '—'} | ${updated} |`;
+  }
+
+  function serialize(doc, date = today()) {
+    const ord = ordered(doc);
+    const preamble = doc.preamble.map(l => (/^Last updated:/.test(l) ? `Last updated: ${date}` : l));
+    const out = [...preamble];
+    // make sure every board section exists, so a moved task is never dropped
+    const sections = [...doc.sections];
+    BOARD.forEach((name, n) => {
+      if (sections.some(s => s.name === name)) return;
+      const prev = n ? sections.findIndex(s => s.name === BOARD[n - 1]) : sections.findIndex(s => s.name === 'Summary');
+      sections.splice(prev + 1, 0, { name, lines: [] });
+    });
+    for (const s of sections) {
+      out.push('', '---', '', `## ${s.name}`);
+      if (s.name === 'Summary') {
+        out.push('', '| Code | Name | Status | Progress | Blocker | Opened | Done | Updated |', '|---|---|---|---|---|---|---|---|');
+        ord.all.forEach(t => out.push(summaryRow(doc, t)));
+        out.push('');
+      } else if (BOARD.includes(s.name)) {
+        out.push('');
+        if (!ord[s.name].length) out.push('_Nothing here._', '');
+        for (const t of ord[s.name]) out.push(`### ${t.code} · ${t.name}`, '', ...t.lines, '');
+      } else if (s.name === 'Activity log') {
+        const lines = trimBlank([...s.lines]);
+        doc.pendingLog.forEach(e => lines.push(`- ${e.date} · ${e.code} · ${e.kind} · ${e.note.replace(/\s+/g, ' ')}`));
+        out.push('', ...lines, '');
+      } else {
+        out.push(...s.lines);
+      }
+    }
+    return out.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\n*$/, '\n').replace(/\n/g, doc.eol);
+  }
+
+  return { parse, serialize, normalize, drift, info, kind, ordered, progress, progressBar, shorten, lastActivity, updatedOf, rename, move, toggleItem, today, ICON, STATUS_TEXT };
+});
+
+</script>
+<script>
+const SNAPSHOT = {"title":"Open With External Application","base":"","generated":"2026-11-26 13:20","markdown":"# Open With External Application – Activity Tracker\n\nCode prefix: OWE\nTimesheet: no\nLast updated: 2026-11-26\n\n---\n\n## Summary\n\n| Code | Name | Status | Progress | Blocker | Opened | Done | Updated |\n|---|---|---|---|---|---|---|---|\n| OWE-001 | Review extension usability | ✅ Done | ▓▓▓▓▓ 3/3 | — | 2026-11-26 | 2026-11-26 | 2026-11-26 |\n| OWE-002 | Improve usability and package version 0.1.5 | ✅ Done | ▓▓▓▓▓ 5/5 | — | 2026-11-26 | 2026-11-26 | 2026-11-26 |\n| OWE-003 | Add configurable application discovery cache | ✅ Done | ▓▓▓▓▓ 4/4 | — | 2026-11-26 | 2026-11-26 | 2026-11-26 |\n| OWE-004 | Preload applications for common workspace formats | ✅ Done | ▓▓▓▓▓ 5/5 | — | 2026-11-26 | 2026-11-26 | 2026-11-26 |\n| OWE-005 | Automate validation and GitHub releases | ✅ Done | ▓▓▓▓▓ 4/4 | — | 2026-11-26 | 2026-11-26 | 2026-11-26 |\n\n---\n\n## Doing\n\n_Nothing here._\n\n---\n\n## Backlog\n\n_Nothing here._\n\n---\n\n## Done\n\n### OWE-001 · Review extension usability\n\n- **Status:** Done\n- **Opened:** 2026-11-26 · **Done:** 2026-11-26\n- **Description:** Review the opening workflow and recommend practical usability improvements.\n- **Done when:** Findings are linked to source behavior, prioritized, and accompanied by validation limits.\n- **Deliverables:** [Usability review](docs/usability-review-2026-11-26.md)\n- **Blocker:** —\n\n**Subtasks**\n\n- [x] OWE-001.1 Review commands, picker, validation, and Windows fallback\n- [x] OWE-001.2 Run the existing automated checks\n- [x] OWE-001.3 Document findings and recommended improvements\n\n---\n\n### OWE-002 · Improve usability and package version 0.1.5\n\n- **Status:** Done\n- **Opened:** 2026-11-26 · **Done:** 2026-11-26\n- **Description:** Apply the five review findings and build an extension package for manual installation.\n- **Done when:** Regression tests pass and the versioned VSIX contains the current compiled modules and Windows scripts.\n- **Deliverables:** [Changes](CHANGELOG.md), [Installable VSIX](open-with-external-0.1.5.vsix)\n- **Blocker:** —\n\n**Subtasks**\n\n- [x] OWE-002.1 Keep the Windows fallback visible and simplify picker rows\n- [x] OWE-002.2 Add discovery cancellation and busy-operation guidance\n- [x] OWE-002.3 Add launch recovery and clarify missing DOCX editor messages\n- [x] OWE-002.4 Pass 34 regression tests and compile version 0.1.5\n- [x] OWE-002.5 Generate the VSIX and verify its packaged contents\n\n---\n\n### OWE-003 · Add configurable application discovery cache\n\n- **Status:** Done\n- **Opened:** 2026-11-26 · **Done:** 2026-11-26\n- **Description:** Reuse discovered applications by file extension for a user-configurable interval and provide manual refresh.\n- **Done when:** Settings, expiry, disabling, refresh and invalidation pass tests, and a current VSIX is available on dev.\n- **Deliverables:** [Settings guide](README.md#settings), [Changes](CHANGELOG.md), [Installable VSIX](open-with-external-0.1.6.vsix)\n- **Blocker:** —\n\n**Subtasks**\n\n- [x] OWE-003.1 Create and switch to dev without committing on main\n- [x] OWE-003.2 Add cache duration setting with default 5 minutes and 0 to disable\n- [x] OWE-003.3 Implement per-extension reuse, expiry, refresh and invalidation\n- [x] OWE-003.4 Pass 41 tests and generate verified version 0.1.6 VSIX\n\n### OWE-004 · Preload applications for common workspace formats\n\n- **Status:** Done\n- **Opened:** 2026-11-26 · **Done:** 2026-11-26\n- **Description:** Add configurable background preloading for common file formats present in local workspace folders.\n- **Done when:** The design is approved, implementation checks pass, and a current VSIX is available for manual installation.\n- **Deliverables:** [Approved design](docs/superpowers/specs/2026-11-26-application-preload-design.md), [Settings](README.md#background-preloading), [GitHub release](https://github.com/rodolfoplondero/vscode-extension-open-with/releases/tag/v0.1.7), [Release notes](docs/releases/v0.1.7.md), [PR](https://github.com/rodolfoplondero/vscode-extension-open-with/pull/1)\n- **Blocker:** —\n\n**Subtasks**\n\n- [x] OWE-004.1 Agree on scanning present formats and configurable enablement and extensions\n- [x] OWE-004.2 Write the short design with defaults and background-work limits\n- [x] OWE-004.3 Confirm the proposed design with the user\n- [x] OWE-004.4 Implement and validate preloading after design approval\n- [x] OWE-004.5 Compile and generate the installable VSIX\n\n### OWE-005 · Automate validation and GitHub releases\n\n- **Status:** Done\n- **Opened:** 2026-11-26 · **Done:** 2026-11-26\n- **Description:** Run Windows tests and package verification for pull requests and publish the VSIX for matching version tags.\n- **Done when:** The workflow is reviewed, local checks pass, and the PR build succeeds in GitHub Actions.\n- **Deliverables:** [Workflow](.github/workflows/ci-release.yml), [Workflow guide](README.md#github-actions), [Successful Windows CI run](https://github.com/rodolfoplondero/vscode-extension-open-with/actions/runs/45857309230)\n- **Blocker:** —\n\n**Subtasks**\n\n- [x] OWE-005.1 Configure PR validation, versioned artifacts and tag-triggered releases\n- [x] OWE-005.2 Validate YAML, matching and mismatched tags, and isolated package activation\n- [x] OWE-005.3 Pass all 60 tests and complete independent workflow review\n- [x] OWE-005.4 Publish the workflow on dev and verify its GitHub Actions run\n\n---\n\n## Activity log\n\n- 2026-11-26 · OWE-001 · Opened · Started the extension usability review.\n- 2026-11-26 · OWE-001 · Done · Documented five findings; compilation and all 25 tests passed.\n- 2026-11-26 · OWE-002 · Opened · Applied the reviewed usability improvements and prepared a manual installation package.\n- 2026-11-26 · OWE-002 · Done · All 34 tests passed; version 0.1.5 VSIX contents and identity verified.\n- 2026-11-26 · OWE-003 · Opened · Continued on dev and added configurable caching with manual refresh.\n- 2026-11-26 · OWE-003 · Done · All 41 tests passed; version 0.1.6 package settings and compiled modules verified.\n- 2026-11-26 · OWE-004 · Opened · Selected workspace scanning and prepared configurable preloading design for review.\n- 2026-11-26 · OWE-004 · Progress · User approved the design; implemented background scanning and foreground priority on dev.\n- 2026-11-26 · OWE-004 · Done · All 60 tests passed; version 0.1.7 package and isolated simulated activation verified.\n- 2026-11-26 · OWE-004 · Progress · Revalidated all 60 tests and prepared the dev changes for commit and pull request.\n- 2026-11-26 · OWE-004 · Progress · Opened PR 1 and published release v0.1.7 with a verified VSIX from dev; main unchanged.\n- 2026-11-26 · OWE-005 · Opened · Configured PR builds and tag releases; local validation and workflow review passed.\n- 2026-11-26 · OWE-005 · Done · GitHub Actions passed Windows tests, VSIX verification and artifact upload; release skipped on PR.\n"};
+(() => {
+  const L = TrackerLib;
+  const COLS = [
+    { key: 'Backlog', label: 'Backlog' },
+    { key: 'Doing', label: 'Doing' },
+    { key: 'Blocked', label: 'Blocked' },
+    { key: 'Done', label: 'Done' },
+  ];
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  // Only http(s)/mailto/file schemes pass through; anything else (javascript:, data:) becomes inert.
+  const href = h => {
+    // Strip controls/whitespace first (browsers ignore them, so "java\tscript:" would slip past a regex).
+    const v = String(h).replace(/[\u0000-\u001F\u007F\s]+/g, '');
+    if (v.startsWith('#')) return v;
+    try {
+      const u = new URL(v, new URL(SNAPSHOT.base || '', location.href));
+      return ['http:', 'https:', 'mailto:', 'file:'].includes(u.protocol) ? u.href : '#';
+    } catch { return '#'; }
+  };
+  const md = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, l, h) => `<a href="${esc(href(h))}">${l}</a>`);
+
+  let text = SNAPSHOT.markdown;
+  let doc = L.parse(text);
+  let dir = null;          // FileSystemDirectoryHandle when live
+  let busy = false;
+  const openDetails = new Set();
+  const supported = 'showDirectoryPicker' in window;
+
+  function toast(msg) {
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 3500);
+  }
+
+  // ---- persistence of the folder handle (IndexedDB) ----
+  const DB_KEY = 'dir:' + SNAPSHOT.title;
+  function idb(mode, fn) {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('tracker-board', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('handles');
+      r.onerror = () => rej(r.error);
+      r.onsuccess = () => {
+        const tx = r.result.transaction('handles', mode);
+        const q = fn(tx.objectStore('handles'));
+        tx.oncomplete = () => res(q && q.result);
+        tx.onerror = () => rej(tx.error);
+      };
+    });
+  }
+  const saveHandle = h => idb('readwrite', s => s.put(h, DB_KEY)).catch(() => {});
+  const loadHandle = () => idb('readonly', s => s.get(DB_KEY)).catch(() => null);
+
+  // ---- file access ----
+  async function readTracker() {
+    const fh = await dir.getFileHandle('TRACKER.md');
+    return (await fh.getFile()).text();
+  }
+  async function writeFile(handleDir, name, content) {
+    const fh = await handleDir.getFileHandle(name, { create: true });
+    const w = await fh.createWritable();
+    await w.write(content);
+    await w.close();
+  }
+  async function useDir(handle) {
+    const perm = await handle.requestPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') throw new Error('Permission denied');
+    dir = handle;
+    const live = await readTracker();
+    const d = L.parse(live);
+    if (d.title !== SNAPSHOT.title && !confirm(`This folder's tracker is "${d.title}", not "${SNAPSHOT.title}". Use it anyway?`)) { dir = null; return; }
+    await saveHandle(handle);
+    text = live; doc = d;
+    render();
+    toast('Connected. Changes are saved to TRACKER.md straight away.');
+  }
+
+  async function connect() {
+    try {
+      const stored = await loadHandle();
+      if (stored) {
+        try { await useDir(stored); if (dir) return; } catch (e) { /* fall back to picker */ }
+      }
+      const h = await window.showDirectoryPicker({ id: 'tracker-board', mode: 'readwrite' });
+      await useDir(h);
+    } catch (e) {
+      if (e.name !== 'AbortError') toast(e.name === 'NotFoundError' ? 'No TRACKER.md in that folder.' : 'Could not connect: ' + e.message);
+    }
+  }
+
+  async function reload() {
+    if (!dir) return;
+    text = await readTracker(); doc = L.parse(text); render(); toast('Reloaded from disk.');
+  }
+
+  // Apply one edit: re-read, refuse on outside changes, back up, write.
+  async function apply(fn) {
+    if (!dir || busy) return;
+    busy = true;
+    try {
+      const fresh = await readTracker();
+      if (fresh !== text) {
+        text = fresh; doc = L.parse(fresh); render();
+        toast('TRACKER.md changed on disk. The board was reloaded; try again.');
+        return;
+      }
+      const d = L.parse(fresh);
+      let changed;
+      try { changed = fn(d); } catch (e) {
+        if (e.code === 'OPEN_SUBTASKS') {
+          if (!confirm(`${e.message}:\n\n${e.open.map(s => '• ' + s.text).join('\n')}\n\nMark them done and close the task?`)) return;
+          changed = fn(d, { closeSubtasks: true });
+        } else { toast(e.message); return; }
+      }
+      if (!changed) return;
+      const out = L.serialize(d);
+      const reports = await dir.getDirectoryHandle('reports', { create: true });
+      await writeFile(reports, 'TRACKER.md.bak', fresh);
+      await writeFile(dir, 'TRACKER.md', out);
+      text = out; doc = L.parse(out);
+      render();
+      toast('Saved: ' + d.pendingLog.map(e => `${e.code} ${e.kind}`).join(', '));
+    } catch (e) {
+      toast('Save failed: ' + e.message);
+    } finally { busy = false; }
+  }
+
+  // ---- actions ----
+  function moveTo(code, target) {
+    let reason = '';
+    if (target === 'Blocked') {
+      reason = prompt('What is the task waiting on? (goes to the Blocker field and the log)');
+      if (!reason || !reason.trim()) return;
+    }
+    apply((d, extra = {}) => L.move(d, code, target, Object.assign({ reason }, extra)));
+  }
+  function rename(code) {
+    const t = doc.tasks.find(x => x.code === code);
+    const name = prompt(`New name for ${code}`, t.name);
+    if (name == null) return;
+    apply(d => L.rename(d, code, name));
+  }
+  function toggle(code, block, index, done) { apply(d => L.toggleItem(d, code, block, index, done)); }
+
+  // ---- render ----
+  function card(t) {
+    const i = L.info(t), k = L.kind(t), p = L.progress(i.subtasks), c = L.progress(i.checklist);
+    const last = L.lastActivity(doc, t);
+    const live = !!dir;
+    const dates = k === 'Done' ? `Opened ${esc(i.opened)} · Done ${esc(i.done)}` : `Opened ${esc(i.opened)} · Last activity ${esc(last ? last.date : i.opened)}`;
+    const item = (s, idx) => `<li class="${s.done ? 'ok' : ''}"><input type="checkbox" ${s.done ? 'checked' : ''} ${live ? '' : 'disabled'} data-act="toggle" data-code="${esc(t.code)}" data-block="${s.block}" data-index="${idx}" aria-label="${esc(s.text)}"><span>${md(s.text)}</span>${!s.done && s.flag ? ` <em class="${s.flag === 'Blocked' ? 'blocked' : ''}">${esc(s.flag)}</em>` : ''}</li>`;
+    const tools = live ? `<div class="tools">
+        <button data-act="rename" data-code="${esc(t.code)}" title="Rename" aria-label="Rename ${esc(t.code)}">✎</button>
+        <select data-act="move" data-code="${esc(t.code)}" aria-label="Move ${esc(t.code)}">${COLS.map(col => `<option value="${col.key}" ${col.key === k ? 'selected' : ''}>${col.label}</option>`).join('')}</select>
+      </div>` : `<span class="code">${L.ICON[k]} ${esc(L.STATUS_TEXT[k])}</span>`;
+    return `<article class="card k-${k.toLowerCase()}" ${live ? 'draggable="true"' : ''} data-code="${esc(t.code)}">
+      <header><span class="code">${esc(t.code)}</span>${tools}</header>
+      <h3>${esc(t.name)}</h3>
+      <p class="desc">${md(i.description)}</p>
+      ${i.doneWhen ? `<p class="meta"><strong>Done when:</strong> ${md(i.doneWhen)}</p>` : ''}
+      ${k === 'Blocked' && i.blocker && i.blocker !== '—' ? `<p class="blocker"><strong>Blocker:</strong> ${md(i.blocker)}</p>` : ''}
+      ${p.total ? `<div class="pbar" title="${p.done} of ${p.total} subtasks"><span style="width:${p.pct}%"></span></div><p class="meta">${p.done}/${p.total} subtasks${c.total ? ` · ${c.done}/${c.total} criteria met` : ''}</p>` : ''}
+      <p class="meta">${dates}</p>
+      ${i.deliverables.length ? `<div class="deliv">${i.deliverables.map(d => `<a href="${esc(href(d.href))}" title="${esc(d.label)}">${esc(d.label.split('/').filter(Boolean).pop() || d.label)}</a>`).join('')}</div>` : ''}
+      ${p.total || c.total ? `<details data-code="${esc(t.code)}" ${openDetails.has(t.code) ? 'open' : ''}><summary>Details</summary>
+        ${p.total ? `<h4>Subtasks</h4><ul class="items">${i.subtasks.map(item).join('')}</ul>` : ''}
+        ${c.total ? `<h4>Definition of done</h4><ul class="items">${i.checklist.map(item).join('')}</ul>` : ''}
+        ${last ? `<h4>Latest activity</h4><p class="desc">${esc(last.date)} · ${md(last.note)}</p>` : ''}
+      </details>` : ''}
+    </article>`;
+  }
+
+  function render() {
+    const ord = L.ordered(doc);
+    const groups = { Backlog: ord.Backlog, Doing: ord.Doing.filter(t => L.kind(t) === 'Doing'), Blocked: ord.Doing.filter(t => L.kind(t) === 'Blocked'), Done: ord.Done };
+    $('title').textContent = doc.title;
+    $('sub').textContent = `Task board · tracker last updated ${doc.updated}`;
+    $('mode').textContent = dir ? 'Live · editing TRACKER.md' : 'Snapshot';
+    $('mode').className = 'mode' + (dir ? ' live' : '');
+    $('connect').hidden = !!dir || !supported;
+    $('reload').hidden = !dir;
+    $('notice').hidden = !!dir;
+    $('notice').textContent = supported
+      ? `Read-only snapshot taken ${SNAPSHOT.generated}. Click "Connect folder to edit" and pick the project folder (the one with TRACKER.md) to rename, move and tick tasks. Each change is saved at once, logged, and the previous file is kept in reports/TRACKER.md.bak.`
+      : `Read-only snapshot taken ${SNAPSHOT.generated}. Editing needs Chrome or Edge (File System Access API).`;
+    $('stats').innerHTML = [['doing', 'Doing'], ['blocked', 'Blocked'], ['', 'Backlog'], ['done', 'Done']]
+      .map(([cls, k]) => `<div class="stat ${cls}"><b>${groups[k].length}</b><span>${k}</span></div>`).join('');
+    $('board').innerHTML = COLS.map(c => `<section class="col" data-col="${c.key}"><h2><span>${c.label}</span><span>${groups[c.key].length}</span></h2>${groups[c.key].length ? groups[c.key].map(card).join('') : '<p class="empty">Nothing here.</p>'}</section>`).join('');
+    const recent = doc.log.slice(-10).reverse();
+    $('log').hidden = !recent.length;
+    $('log').innerHTML = `<h2>Recent activity</h2><ol>${recent.map(e => `<li><span>${esc(e.date)}</span><span class="code">${esc(e.code)}</span><span class="k-${esc(e.kind)}">${esc(e.kind)}</span><span>${md(e.note)}</span></li>`).join('')}</ol>`;
+    renderViews();
+  }
+
+
+  // ---- tabs ----
+  const VIEWS = ['table', 'calendar', 'kanban'];
+  function setView(v, save) {
+    if (!VIEWS.includes(v)) v = 'kanban';
+    VIEWS.forEach(x => { $('v-' + x).hidden = x !== v; });
+    document.querySelectorAll('#tabs .tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === v)));
+    if (save) { try { localStorage.setItem('tracker-view:' + SNAPSHOT.title, v); } catch (e) { /* ignore */ } }
+  }
+  $('tabs').addEventListener('click', e => { const b = e.target.closest('.tab'); if (b) setView(b.dataset.view, true); });
+
+  // ---- table view ----
+  let sortKey = 'default', sortDir = 1, filterText = '';
+  const openRows = new Set();
+  const COLS_T = [['code', 'Code'], ['name', 'Name'], ['status', 'Status'], ['progress', 'Progress'], ['blocker', 'Blocker'], ['opened', 'Opened'], ['done', 'Done'], ['updated', 'Updated']];
+  function rowData(t, idx) {
+    const i = L.info(t), k = L.kind(t), p = L.progress(i.subtasks);
+    return { t, i, k, p, idx, code: t.code, name: t.name, status: L.STATUS_TEXT[k], progress: p.total ? p.done / p.total : -1,
+      blocker: i.blocker === '—' ? '' : i.blocker, opened: i.opened, done: /^\d/.test(i.done) ? i.done : '', updated: L.updatedOf(doc, t) };
+  }
+  function renderTable() {
+    const rows = L.ordered(doc).all.map(rowData);
+    const q = filterText.trim().toLowerCase();
+    let list = q ? rows.filter(r => [r.code, r.name, r.status, r.blocker, r.opened, r.done, r.updated, r.i.description].join(' ').toLowerCase().includes(q)) : rows;
+    if (sortKey !== 'default') {
+      list = list.slice().sort((a, b) => {
+        const x = a[sortKey], y = b[sortKey];
+        const c = typeof x === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true });
+        return (c || a.idx - b.idx) * sortDir;
+      });
+    }
+    const head = COLS_T.map(([k, l]) => `<th data-sort="${k}" tabindex="0" aria-sort="${sortKey === k ? (sortDir > 0 ? 'ascending' : 'descending') : 'none'}">${l}</th>`).join('');
+    const body = list.map(r => {
+      const open = openRows.has(r.code);
+      const bar = r.p.total ? `<span class="pbar"><span style="width:${r.p.pct}%"></span></span>${r.p.done}/${r.p.total}` : '—';
+      const subs = r.i.subtasks.length ? `<ul class="items">${r.i.subtasks.map(s => `<li class="${s.done ? 'ok' : ''}"><input type="checkbox" disabled ${s.done ? 'checked' : ''} aria-label="${esc(s.text)}"><span>${md(s.text)}</span>${!s.done && s.flag ? ` <em class="${s.flag === 'Blocked' ? 'blocked' : ''}">${esc(s.flag)}</em>` : ''}</li>`).join('')}</ul>` : '<span class="meta">No subtasks.</span>';
+      return `<tr class="row k-${r.k.toLowerCase()}" data-code="${esc(r.code)}" tabindex="0" aria-expanded="${open}"><td class="code">${esc(r.code)}</td><td>${esc(r.name)}</td><td class="num">${L.ICON[r.k]} ${esc(r.status)}</td><td class="num">${bar}</td><td>${r.blocker ? md(r.blocker) : '—'}</td><td class="num">${esc(r.opened || '—')}</td><td class="num">${esc(r.done || '—')}</td><td class="num">${esc(r.updated || '—')}</td></tr>`
+        + (open ? `<tr class="sub"><td colspan="8">${r.i.description ? `<p class="desc">${md(r.i.description)}</p>` : ''}<h4>Subtasks</h4>${subs}</td></tr>` : '');
+    }).join('');
+    $('tbl').innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body || '<tr><td colspan="8"><p class="empty">No tasks match.</p></td></tr>'}</tbody>`;
+  }
+  function sortBy(k) {
+    if (sortKey === k) sortDir = -sortDir; else { sortKey = k; sortDir = 1; }
+    renderTable();
+  }
+  $('tbl').addEventListener('click', e => {
+    const th = e.target.closest('th[data-sort]');
+    if (th) return sortBy(th.dataset.sort);
+    const tr = e.target.closest('tr.row');
+    if (tr) { const c = tr.dataset.code; openRows.has(c) ? openRows.delete(c) : openRows.add(c); renderTable(); }
+  });
+  $('tbl').addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const th = e.target.closest('th[data-sort]'), tr = e.target.closest('tr.row');
+    if (th) { e.preventDefault(); sortBy(th.dataset.sort); }
+    else if (tr) { e.preventDefault(); tr.click(); }
+  });
+  $('tfilter').addEventListener('input', e => { filterText = e.target.value; renderTable(); });
+
+  // ---- calendar view ----
+  const pad = n => String(n).padStart(2, '0');
+  const iso = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  let calY = null, calM = null, selEv = null, calKeys = {};
+  function monthOfLatest() {
+    const dates = doc.log.map(e => e.date).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    const d = dates.length ? dates[dates.length - 1] : L.today();
+    return [Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1];
+  }
+  function eventsByDate() {
+    const map = {};
+    const add = (date, ev) => { if (/^\d{4}-\d{2}-\d{2}$/.test(date || '')) (map[date] = map[date] || []).push(ev); };
+    doc.log.forEach(e => add(e.date, { code: e.code, type: e.kind, note: e.note }));
+    doc.tasks.forEach(t => {
+      const i = L.info(t);
+      add(i.opened, { code: t.code, type: 'Marker', label: 'Task opened', note: `Task opened: ${t.name}` });
+      add(i.done, { code: t.code, type: 'Marker', label: 'Task done', note: `Task done: ${t.name}` });
+    });
+    return map;
+  }
+  const evHtml = (ev, key) => `<button class="ev${selEv === key ? ' sel' : ''}" data-key="${esc(key)}" title="${esc(ev.note)}"><span class="c">${esc(ev.code)}</span><span class="chip ${esc(ev.type)}">${esc(ev.label || ev.type)}</span></button>`;
+  function renderCal() {
+    if (calY === null) [calY, calM] = monthOfLatest();
+    $('ctitle').textContent = `${MONTHS[calM]} ${calY}`;
+    const map = eventsByDate(), keys = {}, tdy = L.today();
+    const lead = (new Date(calY, calM, 1).getDay() + 6) % 7;
+    const days = new Date(calY, calM + 1, 0).getDate();
+    const cells = Math.ceil((lead + days) / 7) * 7;
+    let grid = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<div class="dow">${d}</div>`).join('');
+    let agenda = '';
+    for (let c = 0; c < cells; c++) {
+      const dt = new Date(calY, calM, 1 - lead + c), ds = iso(dt.getFullYear(), dt.getMonth(), dt.getDate());
+      const inM = dt.getMonth() === calM;
+      const evs = (map[ds] || []).map((ev, n) => { const key = ds + '#' + n; keys[key] = ev; return evHtml(ev, key); });
+      grid += `<div class="day${inM ? '' : ' out'}${ds === tdy ? ' today' : ''}"><span class="dn">${dt.getDate()}</span>${evs.join('')}</div>`;
+      if (inM && evs.length) agenda += `<div class="adate">${esc(ds)}</div>${evs.join('')}`;
+    }
+    $('cal').innerHTML = grid;
+    $('agenda').innerHTML = agenda || '<p class="empty">No activity this month.</p>';
+    calKeys = keys;
+    const ev = calKeys[selEv];
+    $('cnote').hidden = !ev;
+    if (ev) $('cnote').innerHTML = `<strong>${esc(ev.code)}</strong> · ${esc(selEv.split('#')[0])} · ${esc(ev.label || ev.type)}<p class="desc">${md(ev.note)}</p>`;
+  }
+  function calMove(n) { calM += n; if (calM < 0) { calM = 11; calY--; } if (calM > 11) { calM = 0; calY++; } selEv = null; renderCal(); }
+  $('cprev').addEventListener('click', () => calMove(-1));
+  $('cnext').addEventListener('click', () => calMove(1));
+  $('ctoday').addEventListener('click', () => { const n = new Date(); calY = n.getFullYear(); calM = n.getMonth(); selEv = null; renderCal(); });
+  const calClick = e => { const b = e.target.closest('.ev'); if (b) { selEv = selEv === b.dataset.key ? null : b.dataset.key; renderCal(); } };
+  $('cal').addEventListener('click', calClick);
+  $('agenda').addEventListener('click', calClick);
+
+  function renderViews() { renderTable(); renderCal(); }
+
+  // ---- events (delegated) ----
+  const board = $('board');
+  board.addEventListener('change', e => {
+    const el = e.target;
+    if (el.dataset.act === 'move') moveTo(el.dataset.code, el.value);
+    if (el.dataset.act === 'toggle') toggle(el.dataset.code, el.dataset.block, Number(el.dataset.index), el.checked);
+  });
+  board.addEventListener('click', e => {
+    const el = e.target.closest('[data-act="rename"]');
+    if (el) rename(el.dataset.code);
+  });
+  board.addEventListener('toggle', e => {
+    const d = e.target;
+    if (d.tagName === 'DETAILS') d.open ? openDetails.add(d.dataset.code) : openDetails.delete(d.dataset.code);
+  }, true);
+  board.addEventListener('dragstart', e => {
+    const c = e.target.closest('.card');
+    if (!c || !dir) return;
+    e.dataTransfer.setData('text/plain', c.dataset.code);
+    e.dataTransfer.effectAllowed = 'move';
+    c.classList.add('dragging');
+  });
+  board.addEventListener('dragend', e => { const c = e.target.closest('.card'); if (c) c.classList.remove('dragging'); });
+  board.addEventListener('dragover', e => {
+    const col = e.target.closest('.col');
+    if (!col || !dir) return;
+    e.preventDefault();
+    board.querySelectorAll('.col.over').forEach(x => x !== col && x.classList.remove('over'));
+    col.classList.add('over');
+  });
+  board.addEventListener('dragleave', e => { const col = e.target.closest('.col'); if (col && !col.contains(e.relatedTarget)) col.classList.remove('over'); });
+  board.addEventListener('drop', e => {
+    const col = e.target.closest('.col');
+    if (!col || !dir) return;
+    e.preventDefault();
+    col.classList.remove('over');
+    const code = e.dataTransfer.getData('text/plain');
+    if (code) moveTo(code, col.dataset.col);
+  });
+  $('connect').addEventListener('click', connect);
+  $('reload').addEventListener('click', () => reload().catch(e => toast(e.message)));
+  window.addEventListener('focus', () => { if (dir && !busy) readTracker().then(f => { if (f !== text) { text = f; doc = L.parse(f); render(); toast('Board refreshed from disk.'); } }).catch(() => {}); });
+
+  let saved = null;
+  try { saved = localStorage.getItem('tracker-view:' + SNAPSHOT.title); } catch (e) { /* ignore */ }
+  setView(saved, false);
+  render();
+})();
+</script>
+</body>
+</html>

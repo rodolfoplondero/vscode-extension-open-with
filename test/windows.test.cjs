@@ -4,6 +4,107 @@ const { EventEmitter } = require('node:events');
 const { PassThrough } = require('node:stream');
 const { WindowsBridge, createPowerShellRunner } = require('../dist/windows.js');
 
+test('cache shares results by case-insensitive extension until the configured TTL expires', async () => {
+  let now = 0, queries = 0;
+  const bridge = new WindowsBridge('', async () => { queries++; return '[{"id":"C:\\\\WINWORD.EXE","name":"Word","recommended":true}]'; }, () => 5, () => now);
+  await bridge.list('C:\\one.docx');
+  now = 299999;
+  await bridge.list('D:\\two.DOCX');
+  assert.equal(queries, 1);
+  now = 300000;
+  await bridge.list('C:\\three.docx');
+  assert.equal(queries, 2);
+  await bridge.list('C:\\other.txt');
+  assert.equal(queries, 3);
+});
+
+test('zero minutes disables cache; changing the interval changes expiry', async () => {
+  let minutes = 0, queries = 0, now = 0;
+  const bridge = new WindowsBridge('', async () => { queries++; return '[{"id":"editor","name":"Editor","recommended":true}]'; }, () => minutes, () => now);
+  await bridge.list('a.txt'); await bridge.list('b.txt');
+  assert.equal(queries, 2);
+  minutes = 2;
+  await bridge.list('a.txt'); await bridge.list('b.txt');
+  assert.equal(queries, 3);
+  minutes = 1; now = 60000;
+  await bridge.list('a.txt');
+  assert.equal(queries, 4);
+});
+
+test('empty lists, failed queries and extensionless files are not cached', async () => {
+  let queries = 0;
+  const bridge = new WindowsBridge('', async () => { queries++; if (queries === 1) throw new Error('blocked'); return '[]'; }, () => 5);
+  await assert.rejects(bridge.list('a.txt'), /blocked/);
+  await bridge.list('a.txt'); await bridge.list('b.txt');
+  assert.equal(queries, 3);
+  assert.equal(bridge.getCached('a.txt'), undefined);
+  const extensionless = new WindowsBridge('', async () => '[{"id":"editor","name":"Editor","recommended":true}]', () => 5);
+  await extensionless.list('README');
+  assert.equal(extensionless.getCached('LICENSE'), undefined);
+});
+
+test('launch errors and manual invalidation clear only the relevant format; settings clear all', async () => {
+  const bridge = new WindowsBridge('', async request => {
+    if (request.action === 'open') throw new Error('removed');
+    return '[{"id":"editor","name":"Editor","recommended":true}]';
+  }, () => 5);
+  await bridge.list('a.txt'); await bridge.list('a.pdf');
+  await assert.rejects(bridge.open('a.txt', 'editor'), /removed/);
+  assert.equal(bridge.getCached('a.txt'), undefined);
+  assert.ok(bridge.getCached('a.pdf'));
+  bridge.invalidate('other.PDF');
+  assert.equal(bridge.getCached('a.pdf'), undefined);
+  await bridge.list('a.txt');
+  bridge.clearCache();
+  assert.equal(bridge.getCached('a.txt'), undefined);
+  await bridge.list('a.pdf');
+  await bridge.native('a.pdf');
+  assert.equal(bridge.getCached('a.pdf'), undefined);
+});
+
+test('discovery passes cancellation to the process and rejects on abort', async () => {
+  const controller = new AbortController();
+  const runner = createPowerShellRunner('/extension', (_exe, _args, options) => {
+    assert.equal(options.signal, controller.signal);
+    const child = new EventEmitter();
+    child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
+    options.signal.addEventListener('abort', () => {
+      child.emit('error', Object.assign(new Error('aborted'), { name: 'AbortError' }));
+      setImmediate(() => child.emit('close', null, 'SIGTERM'));
+    });
+    child.stdin.on('finish', () => controller.abort());
+    return child;
+  });
+  await assert.rejects(new WindowsBridge('', runner).list('C:\\file.txt', controller.signal), { name: 'AbortError' });
+});
+
+test('cancellation waits for process close before permitting another query', async () => {
+  const controller = new AbortController();
+  let child, settled = false;
+  const runner = createPowerShellRunner('', (_exe, _args, options) => {
+    child = new EventEmitter();
+    child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.stdin = new PassThrough();
+    options.signal.addEventListener('abort', () => child.emit('error', Object.assign(new Error('aborted'), { name: 'AbortError' })));
+    return child;
+  });
+  const pending = runner({ action: 'list', filePath: 'a.txt' }, controller.signal).finally(() => { settled = true; });
+  const rejected = assert.rejects(pending, { name: 'AbortError' });
+  controller.abort();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(settled, false);
+  child.emit('close', null, 'SIGTERM');
+  await rejected;
+});
+
+test('discovery ignores a result arriving after cancellation', async () => {
+  const controller = new AbortController();
+  const bridge = new WindowsBridge('', async () => {
+    controller.abort(); return '[{"id":"editor","name":"Editor","recommended":true}]';
+  }, () => 5);
+  await assert.rejects(bridge.list('C:\\file.txt', controller.signal), { name: 'AbortError' });
+  assert.equal(bridge.getCached('C:\\file.txt'), undefined);
+});
+
 test('transports Unicode paths and metacharacters as JSON without a shell', async () => {
   let invocation, input = '';
   const fakeSpawn = (exe, args, options) => {

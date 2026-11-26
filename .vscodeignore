@@ -1,8 +1,9 @@
 .vscode/**
-node_modules/**
+.github/**
 src/**
 test/**
 docs/**
+TRACKER*
 .gitignore
 *.vsix
 *.zip
