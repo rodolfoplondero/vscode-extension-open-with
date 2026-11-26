@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3 — 2026-11-26
+
+- Rename the repository to vscode-open-with-external and update the manifest links.
+
 ## 0.2.2 — 2026-11-26
 
 - Open the application picker immediately with a progress bar instead of waiting for Windows.
